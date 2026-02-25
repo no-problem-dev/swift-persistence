@@ -1,3 +1,0 @@
-module PersistenceUserDefaults {
-    header "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaults.build/include/PersistenceUserDefaults-Swift.h"
-}

@@ -1,3 +1,0 @@
-module PersistenceFileSystem {
-    header "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/include/PersistenceFileSystem-Swift.h"
-}

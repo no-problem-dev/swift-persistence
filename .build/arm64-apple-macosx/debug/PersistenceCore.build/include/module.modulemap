@@ -1,3 +1,0 @@
-module PersistenceCore {
-    header "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceCore.build/include/PersistenceCore-Swift.h"
-}

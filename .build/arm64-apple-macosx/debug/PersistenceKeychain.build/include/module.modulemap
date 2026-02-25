@@ -1,3 +1,0 @@
-module PersistenceKeychain {
-    header "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceKeychain.build/include/PersistenceKeychain-Swift.h"
-}
