@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/master.swiftdeps"
+  },
+  "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/Sources/PersistenceFileSystem/FileSystemDocumentStore.swift": {
+    "dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemDocumentStore.d",
+    "object": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemDocumentStore.swift.o",
+    "swiftmodule": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemDocumentStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemDocumentStore.swiftdeps",
+    "diagnostics": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemDocumentStore.dia"
+  },
+  "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/Sources/PersistenceFileSystem/FileSystemRegistryStore.swift": {
+    "dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemRegistryStore.d",
+    "object": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemRegistryStore.swift.o",
+    "swiftmodule": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemRegistryStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemRegistryStore.swiftdeps",
+    "diagnostics": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystem.build/FileSystemRegistryStore.dia"
+  }
+}

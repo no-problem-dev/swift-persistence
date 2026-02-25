@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/master.swiftdeps"
+  },
+  "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/Tests/PersistenceTestingTests/InMemoryStoreTests.swift": {
+    "dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/InMemoryStoreTests.d",
+    "object": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/InMemoryStoreTests.swift.o",
+    "swiftmodule": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/InMemoryStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/InMemoryStoreTests.swiftdeps",
+    "diagnostics": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceTestingTests.build/InMemoryStoreTests.dia"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/master.swiftdeps"
+  },
+  "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/Tests/PersistenceFileSystemTests/FileSystemStoreTests.swift": {
+    "dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/FileSystemStoreTests.d",
+    "object": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/FileSystemStoreTests.swift.o",
+    "swiftmodule": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/FileSystemStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/FileSystemStoreTests.swiftdeps",
+    "diagnostics": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceFileSystemTests.build/FileSystemStoreTests.dia"
+  }
+}

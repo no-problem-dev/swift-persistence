@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/master.swiftdeps"
+  },
+  "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/Tests/PersistenceUserDefaultsTests/UserDefaultsKeyValueStoreTests.swift": {
+    "dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/UserDefaultsKeyValueStoreTests.d",
+    "object": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/UserDefaultsKeyValueStoreTests.swift.o",
+    "swiftmodule": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/UserDefaultsKeyValueStoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/UserDefaultsKeyValueStoreTests.swiftdeps",
+    "diagnostics": "/Users/kyoichi/life/NOPROBLEM/SwiftPackages/LLM/swift-persistence/.build/arm64-apple-macosx/debug/PersistenceUserDefaultsTests.build/UserDefaultsKeyValueStoreTests.dia"
+  }
+}
