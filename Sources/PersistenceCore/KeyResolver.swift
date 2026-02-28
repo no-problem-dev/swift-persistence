@@ -11,7 +11,7 @@ public protocol KeyResolver: Sendable {
     /// Resolves a string value for the given logical key.
     ///
     /// - Returns: The resolved value, or `nil` if no source has a value.
-    func resolve(_ key: String) -> String?
+    func resolve(_ key: String) async -> String?
 }
 
 /// Resolves values by checking sources in order: Info.plist → SecureStore → KeyValueStore.
@@ -59,7 +59,7 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         self.keyMapping = keyMapping
     }
 
-    public func resolve(_ key: String) -> String? {
+    public func resolve(_ key: String) async -> String? {
         // 1. Info.plist (build-time injection via xcconfig)
         if let value = infoPlistLookup(key),
            !value.isEmpty,
@@ -70,13 +70,13 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         guard let mapping = keyMapping[key] else { return nil }
 
         // 2. SecureStore (Keychain)
-        if let value = try? secureStore.getString(forKey: mapping.secure),
+        if let value = try? await secureStore.getString(forKey: mapping.secure),
            !value.isEmpty {
             return value
         }
 
         // 3. KeyValueStore (UserDefaults — legacy fallback during migration)
-        if let value = try? keyValueStore.string(forKey: mapping.keyValue),
+        if let value = try? await keyValueStore.string(forKey: mapping.keyValue),
            !value.isEmpty {
             return value
         }

@@ -37,112 +37,115 @@ private func removeTempDir(_ dir: URL) {
 struct FileSystemDocumentStoreTests {
 
     @Test("Save and load round-trip")
-    func saveAndLoad() throws {
+    func saveAndLoad() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let doc = TestDocument.sample(title: "Hello")
-        try store.save(doc)
-        let loaded = try store.load(id: doc.id)
+        try await store.save(doc)
+        let loaded = try await store.load(id: doc.id)
         #expect(loaded.id == doc.id)
         #expect(loaded.title == doc.title)
     }
 
     @Test("LoadAll returns all documents")
-    func loadAll() throws {
+    func loadAll() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let docs = (0..<3).map { TestDocument.sample(title: "Doc \($0)") }
         for doc in docs {
-            try store.save(doc)
+            try await store.save(doc)
         }
-        let loaded = try store.loadAll()
+        let loaded = try await store.loadAll()
         #expect(loaded.count == 3)
     }
 
     @Test("LoadAll returns empty array for empty directory")
-    func loadAllEmpty() throws {
+    func loadAllEmpty() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
-        let loaded = try store.loadAll()
+        let loaded = try await store.loadAll()
         #expect(loaded.isEmpty)
     }
 
     @Test("Load nonexistent throws notFound")
-    func loadNotFound() throws {
+    func loadNotFound() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
-        #expect(throws: PersistenceError.self) {
-            try store.load(id: UUID())
+        await #expect(throws: PersistenceError.self) {
+            try await store.load(id: UUID())
         }
     }
 
     @Test("Delete removes file")
-    func delete() throws {
+    func delete() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let doc = TestDocument.sample()
-        try store.save(doc)
-        try store.delete(id: doc.id)
-        #expect(!store.exists(id: doc.id))
+        try await store.save(doc)
+        try await store.delete(id: doc.id)
+        let exists = await store.exists(id: doc.id)
+        #expect(!exists)
     }
 
     @Test("Delete nonexistent throws notFound")
-    func deleteNotFound() throws {
+    func deleteNotFound() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
-        #expect(throws: PersistenceError.self) {
-            try store.delete(id: UUID())
+        await #expect(throws: PersistenceError.self) {
+            try await store.delete(id: UUID())
         }
     }
 
     @Test("Exists returns correct boolean")
-    func exists() throws {
+    func exists() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let id = UUID()
-        #expect(!store.exists(id: id))
-        try store.save(TestDocument(id: id, title: "t", createdAt: Date()))
-        #expect(store.exists(id: id))
+        var result = await store.exists(id: id)
+        #expect(!result)
+        try await store.save(TestDocument(id: id, title: "t", createdAt: Date()))
+        result = await store.exists(id: id)
+        #expect(result)
     }
 
     @Test("Overwrite replaces document")
-    func overwrite() throws {
+    func overwrite() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let id = UUID()
-        try store.save(TestDocument(id: id, title: "v1", createdAt: Date()))
-        try store.save(TestDocument(id: id, title: "v2", createdAt: Date()))
-        let loaded = try store.load(id: id)
+        try await store.save(TestDocument(id: id, title: "v1", createdAt: Date()))
+        try await store.save(TestDocument(id: id, title: "v2", createdAt: Date()))
+        let loaded = try await store.load(id: id)
         #expect(loaded.title == "v2")
     }
 
     @Test("Data persists across store instances")
-    func persistsAcrossInstances() throws {
+    func persistsAcrossInstances() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store1 = try FileSystemDocumentStore<TestDocument>(directory: dir)
         let doc = TestDocument.sample(title: "Persistent")
-        try store1.save(doc)
+        try await store1.save(doc)
 
         let store2 = try FileSystemDocumentStore<TestDocument>(directory: dir)
-        let loaded = try store2.load(id: doc.id)
+        let loaded = try await store2.load(id: doc.id)
         #expect(loaded.title == "Persistent")
     }
 }
@@ -153,17 +156,17 @@ struct FileSystemDocumentStoreTests {
 struct FileSystemRegistryStoreTests {
 
     @Test("Load returns empty dict when file is missing")
-    func loadEmpty() throws {
+    func loadEmpty() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = FileSystemRegistryStore<TestEntry>(directory: dir)
-        let registry = store.load()
+        let registry = await store.load()
         #expect(registry.isEmpty)
     }
 
     @Test("Save and load round-trip")
-    func saveAndLoad() throws {
+    func saveAndLoad() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
@@ -172,26 +175,26 @@ struct FileSystemRegistryStoreTests {
             "model-a": TestEntry(name: "Model A", size: 1024),
             "model-b": TestEntry(name: "Model B", size: 2048),
         ]
-        try store.save(registry)
-        let loaded = store.load()
+        try await store.save(registry)
+        let loaded = await store.load()
         #expect(loaded == registry)
     }
 
     @Test("Save creates directory and file")
-    func createsDirectory() throws {
+    func createsDirectory() async throws {
         let dir = try makeTempDir()
         let subDir = dir.appendingPathComponent("nested/deep")
         defer { removeTempDir(dir) }
 
         let store = FileSystemRegistryStore<TestEntry>(directory: subDir)
-        try store.save(["key": TestEntry(name: "test", size: 0)])
+        try await store.save(["key": TestEntry(name: "test", size: 0)])
 
         let registryPath = subDir.appendingPathComponent("registry.json")
         #expect(FileManager.default.fileExists(atPath: registryPath.path))
     }
 
     @Test("Custom filename")
-    func customFilename() throws {
+    func customFilename() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
@@ -199,34 +202,34 @@ struct FileSystemRegistryStoreTests {
             directory: dir,
             filename: "adapter-registry.json"
         )
-        try store.save(["key": TestEntry(name: "test", size: 0)])
+        try await store.save(["key": TestEntry(name: "test", size: 0)])
 
         let registryPath = dir.appendingPathComponent("adapter-registry.json")
         #expect(FileManager.default.fileExists(atPath: registryPath.path))
     }
 
     @Test("Data persists across store instances")
-    func persistsAcrossInstances() throws {
+    func persistsAcrossInstances() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store1 = FileSystemRegistryStore<TestEntry>(directory: dir)
-        try store1.save(["key": TestEntry(name: "persistent", size: 42)])
+        try await store1.save(["key": TestEntry(name: "persistent", size: 42)])
 
         let store2 = FileSystemRegistryStore<TestEntry>(directory: dir)
-        let loaded = store2.load()
+        let loaded = await store2.load()
         #expect(loaded["key"]?.name == "persistent")
     }
 
     @Test("Overwrite replaces entire registry")
-    func overwrite() throws {
+    func overwrite() async throws {
         let dir = try makeTempDir()
         defer { removeTempDir(dir) }
 
         let store = FileSystemRegistryStore<TestEntry>(directory: dir)
-        try store.save(["a": TestEntry(name: "a", size: 1)])
-        try store.save(["b": TestEntry(name: "b", size: 2)])
-        let loaded = store.load()
+        try await store.save(["a": TestEntry(name: "a", size: 1)])
+        try await store.save(["b": TestEntry(name: "b", size: 2)])
+        let loaded = await store.load()
         #expect(loaded.keys.contains("b"))
         #expect(!loaded.keys.contains("a"))
     }

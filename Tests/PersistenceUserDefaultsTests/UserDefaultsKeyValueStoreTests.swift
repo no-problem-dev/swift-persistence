@@ -17,84 +17,86 @@ struct UserDefaultsKeyValueStoreTests {
     }
 
     @Test("String round-trip")
-    func stringRoundTrip() throws {
+    func stringRoundTrip() async throws {
         let store = makeStore()
-        try store.setValue("hello", forKey: "key")
-        #expect(try store.string(forKey: "key") == "hello")
+        try await store.setValue("hello", forKey: "key")
+        #expect(try await store.string(forKey: "key") == "hello")
     }
 
     @Test("Bool round-trip")
-    func boolRoundTrip() throws {
+    func boolRoundTrip() async throws {
         let store = makeStore()
-        try store.setValue(true, forKey: "flag")
-        #expect(try store.bool(forKey: "flag") == true)
+        try await store.setValue(true, forKey: "flag")
+        #expect(try await store.bool(forKey: "flag") == true)
     }
 
     @Test("Int round-trip")
-    func intRoundTrip() throws {
+    func intRoundTrip() async throws {
         let store = makeStore()
-        try store.setValue(42, forKey: "count")
-        #expect(try store.int(forKey: "count") == 42)
+        try await store.setValue(42, forKey: "count")
+        #expect(try await store.int(forKey: "count") == 42)
     }
 
     @Test("Double round-trip")
-    func doubleRoundTrip() throws {
+    func doubleRoundTrip() async throws {
         let store = makeStore()
-        try store.setValue(3.14, forKey: "pi")
-        #expect(try store.double(forKey: "pi") == 3.14)
+        try await store.setValue(3.14, forKey: "pi")
+        #expect(try await store.double(forKey: "pi") == 3.14)
     }
 
     @Test("Data round-trip")
-    func dataRoundTrip() throws {
+    func dataRoundTrip() async throws {
         let store = makeStore()
         let data = Data([0x01, 0x02, 0x03])
-        try store.setValue(data, forKey: "blob")
-        #expect(try store.data(forKey: "blob") == data)
+        try await store.setValue(data, forKey: "blob")
+        #expect(try await store.data(forKey: "blob") == data)
     }
 
     @Test("Codable struct round-trip")
-    func codableRoundTrip() throws {
+    func codableRoundTrip() async throws {
         let store = makeStore()
         let value = CodableStruct(name: "test", value: 123)
-        try store.setValue(value, forKey: "entry")
-        let result: CodableStruct? = try store.value(forKey: "entry", type: CodableStruct.self)
+        try await store.setValue(value, forKey: "entry")
+        let result: CodableStruct? = try await store.value(forKey: "entry", type: CodableStruct.self)
         #expect(result == value)
     }
 
     @Test("Returns nil for missing key")
-    func missingKey() throws {
+    func missingKey() async throws {
         let store = makeStore()
-        #expect(try store.string(forKey: "nonexistent") == nil)
+        #expect(try await store.string(forKey: "nonexistent") == nil)
     }
 
     @Test("Overwrite existing value")
-    func overwrite() throws {
+    func overwrite() async throws {
         let store = makeStore()
-        try store.setValue("first", forKey: "key")
-        try store.setValue("second", forKey: "key")
-        #expect(try store.string(forKey: "key") == "second")
+        try await store.setValue("first", forKey: "key")
+        try await store.setValue("second", forKey: "key")
+        #expect(try await store.string(forKey: "key") == "second")
     }
 
     @Test("Remove value")
-    func removeValue() throws {
+    func removeValue() async throws {
         let store = makeStore()
-        try store.setValue("hello", forKey: "key")
-        try store.removeValue(forKey: "key")
-        #expect(try store.string(forKey: "key") == nil)
+        try await store.setValue("hello", forKey: "key")
+        await store.removeValue(forKey: "key")
+        #expect(try await store.string(forKey: "key") == nil)
     }
 
     @Test("Contains returns correct boolean")
-    func contains() throws {
+    func contains() async throws {
         let store = makeStore()
-        #expect(!store.contains(key: "key"))
-        try store.setValue("value", forKey: "key")
-        #expect(store.contains(key: "key"))
+        var result = await store.contains(key: "key")
+        #expect(!result)
+        try await store.setValue("value", forKey: "key")
+        result = await store.contains(key: "key")
+        #expect(result)
     }
 
     @Test("Bool nil for missing key (not false)")
-    func boolNilNotFalse() throws {
+    func boolNilNotFalse() async throws {
         let store = makeStore()
-        let result = try store.bool(forKey: "missing")
+        let result = try await store.bool(forKey: "missing")
         #expect(result == nil)
     }
 }

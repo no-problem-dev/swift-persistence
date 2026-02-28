@@ -6,7 +6,10 @@ import PersistenceCore
 /// Primitive types (`String`, `Bool`, `Int`, `Double`, `Data`) use
 /// UserDefaults' native accessors for efficiency. All other `Codable` types
 /// are round-tripped through `JSONEncoder`/`JSONDecoder`.
-public final class UserDefaultsKeyValueStore: KeyValueStore, @unchecked Sendable {
+///
+/// Implemented as an `actor` to guarantee that encoder/decoder access
+/// is data-race free and to move work off the caller's actor.
+public actor UserDefaultsKeyValueStore: KeyValueStore {
 
     private let defaults: UserDefaults
     private let encoder: JSONEncoder
@@ -69,7 +72,7 @@ public final class UserDefaultsKeyValueStore: KeyValueStore, @unchecked Sendable
         }
     }
 
-    public func removeValue(forKey key: String) throws {
+    public func removeValue(forKey key: String) {
         defaults.removeObject(forKey: key)
     }
 

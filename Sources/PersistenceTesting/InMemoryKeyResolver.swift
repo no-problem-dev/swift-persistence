@@ -13,7 +13,7 @@ public struct InMemoryKeyResolver: KeyResolver, Sendable {
         self.values = values
     }
 
-    public func resolve(_ key: String) -> String? {
+    public func resolve(_ key: String) async -> String? {
         values[key]
     }
 }

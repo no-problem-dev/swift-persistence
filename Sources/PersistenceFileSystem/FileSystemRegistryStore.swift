@@ -6,7 +6,10 @@ import PersistenceCore
 /// Generalizes the registry pattern where a single JSON file maps
 /// string keys to Codable metadata entries. The file is read/written
 /// atomically.
-public struct FileSystemRegistryStore<Entry: Codable & Sendable>: RegistryStore, Sendable {
+///
+/// Implemented as an `actor` so that file I/O is automatically moved
+/// off the caller's actor (e.g., `@MainActor`) via actor hop.
+public actor FileSystemRegistryStore<Entry: Codable & Sendable>: RegistryStore {
 
     private let registryURL: URL
 

@@ -3,12 +3,12 @@ import PersistenceCore
 
 /// In-memory ``SecureStore`` for testing.
 ///
-/// Thread-safe via `NSLock`. Simulates Keychain behavior without
-/// requiring entitlements or a real Keychain.
-public final class InMemorySecureStore: SecureStore, @unchecked Sendable {
+/// Actor isolation replaces manual `NSLock` synchronization,
+/// simulating Keychain behavior without requiring entitlements
+/// or a real Keychain.
+public actor InMemorySecureStore: SecureStore {
 
     private var storage: [String: Data] = [:]
-    private let lock = NSLock()
 
     public init() {}
 
@@ -34,33 +34,23 @@ public final class InMemorySecureStore: SecureStore, @unchecked Sendable {
     }
 
     public func getData(forKey key: String) throws -> Data? {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage[key]
+        storage[key]
     }
 
     public func setData(_ value: Data, forKey key: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
         storage[key] = value
     }
 
-    public func remove(forKey key: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
+    public func remove(forKey key: String) {
         storage.removeValue(forKey: key)
     }
 
     public func contains(key: String) throws -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage[key] != nil
+        storage[key] != nil
     }
 
     /// Returns the number of stored entries (for test assertions).
     public var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage.count
+        storage.count
     }
 }

@@ -5,7 +5,10 @@ import PersistenceCore
 ///
 /// Each document is saved as `{id}.json` in the configured directory.
 /// All file writes are atomic to prevent corruption.
-public struct FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore, Sendable
+///
+/// Implemented as an `actor` so that file I/O is automatically moved
+/// off the caller's actor (e.g., `@MainActor`) via actor hop.
+public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore
     where T.ID: CustomStringConvertible & Sendable
 {
     public typealias Document = T

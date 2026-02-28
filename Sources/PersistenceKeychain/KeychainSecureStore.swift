@@ -6,7 +6,10 @@ import PersistenceCore
 ///
 /// Uses `kSecClassGenericPassword` with a configurable service name.
 /// Each key is stored as a separate Keychain item with the key as the account attribute.
-public struct KeychainSecureStore: SecureStore, Sendable {
+///
+/// Implemented as an `actor` to move Keychain IPC off the caller's actor
+/// and to provide data-race safety.
+public actor KeychainSecureStore: SecureStore {
 
     private let service: String
     private let accessGroup: String?

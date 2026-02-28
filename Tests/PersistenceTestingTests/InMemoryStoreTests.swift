@@ -22,68 +22,71 @@ private struct SampleEntry: Codable, Sendable, Equatable {
 struct InMemoryKeyValueStoreTests {
 
     @Test("String round-trip")
-    func stringRoundTrip() throws {
+    func stringRoundTrip() async throws {
         let store = InMemoryKeyValueStore()
-        try store.setValue("hello", forKey: "key")
-        let result = try store.string(forKey: "key")
+        try await store.setValue("hello", forKey: "key")
+        let result = try await store.string(forKey: "key")
         #expect(result == "hello")
     }
 
     @Test("Bool round-trip")
-    func boolRoundTrip() throws {
+    func boolRoundTrip() async throws {
         let store = InMemoryKeyValueStore()
-        try store.setValue(true, forKey: "flag")
-        let result = try store.bool(forKey: "flag")
+        try await store.setValue(true, forKey: "flag")
+        let result = try await store.bool(forKey: "flag")
         #expect(result == true)
     }
 
     @Test("Int round-trip")
-    func intRoundTrip() throws {
+    func intRoundTrip() async throws {
         let store = InMemoryKeyValueStore()
-        try store.setValue(42, forKey: "count")
-        let result = try store.int(forKey: "count")
+        try await store.setValue(42, forKey: "count")
+        let result = try await store.int(forKey: "count")
         #expect(result == 42)
     }
 
     @Test("Codable struct round-trip")
-    func codableRoundTrip() throws {
+    func codableRoundTrip() async throws {
         let store = InMemoryKeyValueStore()
         let entry = SampleEntry(name: "test", value: 123)
-        try store.setValue(entry, forKey: "entry")
-        let result: SampleEntry? = try store.value(forKey: "entry", type: SampleEntry.self)
+        try await store.setValue(entry, forKey: "entry")
+        let result: SampleEntry? = try await store.value(forKey: "entry", type: SampleEntry.self)
         #expect(result == entry)
     }
 
     @Test("Returns nil for missing key")
-    func missingKey() throws {
+    func missingKey() async throws {
         let store = InMemoryKeyValueStore()
-        let result = try store.string(forKey: "nonexistent")
+        let result = try await store.string(forKey: "nonexistent")
         #expect(result == nil)
     }
 
     @Test("Overwrite existing value")
-    func overwrite() throws {
+    func overwrite() async throws {
         let store = InMemoryKeyValueStore()
-        try store.setValue("first", forKey: "key")
-        try store.setValue("second", forKey: "key")
-        #expect(try store.string(forKey: "key") == "second")
+        try await store.setValue("first", forKey: "key")
+        try await store.setValue("second", forKey: "key")
+        #expect(try await store.string(forKey: "key") == "second")
     }
 
     @Test("Remove value")
-    func removeValue() throws {
+    func removeValue() async throws {
         let store = InMemoryKeyValueStore()
-        try store.setValue("hello", forKey: "key")
-        try store.removeValue(forKey: "key")
-        #expect(try store.string(forKey: "key") == nil)
-        #expect(!store.contains(key: "key"))
+        try await store.setValue("hello", forKey: "key")
+        await store.removeValue(forKey: "key")
+        #expect(try await store.string(forKey: "key") == nil)
+        let contains = await store.contains(key: "key")
+        #expect(!contains)
     }
 
     @Test("Contains")
-    func contains() throws {
+    func contains() async throws {
         let store = InMemoryKeyValueStore()
-        #expect(!store.contains(key: "key"))
-        try store.setValue("hello", forKey: "key")
-        #expect(store.contains(key: "key"))
+        var result = await store.contains(key: "key")
+        #expect(!result)
+        try await store.setValue("hello", forKey: "key")
+        result = await store.contains(key: "key")
+        #expect(result)
     }
 }
 
@@ -93,52 +96,52 @@ struct InMemoryKeyValueStoreTests {
 struct InMemorySecureStoreTests {
 
     @Test("String round-trip")
-    func stringRoundTrip() throws {
+    func stringRoundTrip() async throws {
         let store = InMemorySecureStore()
-        try store.setString("api-key-123", forKey: "anthropic")
-        let result = try store.getString(forKey: "anthropic")
+        try await store.setString("api-key-123", forKey: "anthropic")
+        let result = try await store.getString(forKey: "anthropic")
         #expect(result == "api-key-123")
     }
 
     @Test("Data round-trip")
-    func dataRoundTrip() throws {
+    func dataRoundTrip() async throws {
         let store = InMemorySecureStore()
         let data = Data([0x01, 0x02, 0x03])
-        try store.setData(data, forKey: "blob")
-        let result = try store.getData(forKey: "blob")
+        try await store.setData(data, forKey: "blob")
+        let result = try await store.getData(forKey: "blob")
         #expect(result == data)
     }
 
     @Test("Returns nil for missing key")
-    func missingKey() throws {
+    func missingKey() async throws {
         let store = InMemorySecureStore()
-        let result = try store.getString(forKey: "nonexistent")
+        let result = try await store.getString(forKey: "nonexistent")
         #expect(result == nil)
     }
 
     @Test("Overwrite existing value")
-    func overwrite() throws {
+    func overwrite() async throws {
         let store = InMemorySecureStore()
-        try store.setString("old-key", forKey: "api")
-        try store.setString("new-key", forKey: "api")
-        #expect(try store.getString(forKey: "api") == "new-key")
+        try await store.setString("old-key", forKey: "api")
+        try await store.setString("new-key", forKey: "api")
+        #expect(try await store.getString(forKey: "api") == "new-key")
     }
 
     @Test("Remove value")
-    func remove() throws {
+    func remove() async throws {
         let store = InMemorySecureStore()
-        try store.setString("secret", forKey: "key")
-        try store.remove(forKey: "key")
-        #expect(try store.getString(forKey: "key") == nil)
-        #expect(try !store.contains(key: "key"))
+        try await store.setString("secret", forKey: "key")
+        await store.remove(forKey: "key")
+        #expect(try await store.getString(forKey: "key") == nil)
+        #expect(try await !store.contains(key: "key"))
     }
 
     @Test("Contains")
-    func contains() throws {
+    func contains() async throws {
         let store = InMemorySecureStore()
-        #expect(try !store.contains(key: "key"))
-        try store.setString("value", forKey: "key")
-        #expect(try store.contains(key: "key"))
+        #expect(try await !store.contains(key: "key"))
+        try await store.setString("value", forKey: "key")
+        #expect(try await store.contains(key: "key"))
     }
 }
 
@@ -148,76 +151,81 @@ struct InMemorySecureStoreTests {
 struct InMemoryDocumentStoreTests {
 
     @Test("Save and load round-trip")
-    func saveAndLoad() throws {
+    func saveAndLoad() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
         let item = SampleItem(id: UUID(), name: "test", count: 1)
-        try store.save(item)
-        let loaded = try store.load(id: item.id)
+        try await store.save(item)
+        let loaded = try await store.load(id: item.id)
         #expect(loaded == item)
     }
 
     @Test("LoadAll returns all documents")
-    func loadAll() throws {
+    func loadAll() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
         let items = (0..<3).map { SampleItem(id: UUID(), name: "item\($0)", count: $0) }
         for item in items {
-            try store.save(item)
+            try await store.save(item)
         }
-        let loaded = try store.loadAll()
+        let loaded = try await store.loadAll()
         #expect(loaded.count == 3)
     }
 
     @Test("LoadAll returns empty array when empty")
-    func loadAllEmpty() throws {
+    func loadAllEmpty() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
-        let loaded = try store.loadAll()
+        let loaded = try await store.loadAll()
         #expect(loaded.isEmpty)
     }
 
     @Test("Load nonexistent throws notFound")
-    func loadNotFound() throws {
+    func loadNotFound() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
-        #expect(throws: PersistenceError.self) {
-            try store.load(id: UUID())
+        await #expect(throws: PersistenceError.self) {
+            try await store.load(id: UUID())
         }
     }
 
     @Test("Delete removes document")
-    func delete() throws {
+    func delete() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
         let item = SampleItem(id: UUID(), name: "test", count: 1)
-        try store.save(item)
-        try store.delete(id: item.id)
-        #expect(!store.exists(id: item.id))
-        #expect(store.count == 0)
+        try await store.save(item)
+        try await store.delete(id: item.id)
+        let exists = await store.exists(id: item.id)
+        #expect(!exists)
+        let count = await store.count
+        #expect(count == 0)
     }
 
     @Test("Delete nonexistent throws notFound")
-    func deleteNotFound() throws {
+    func deleteNotFound() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
-        #expect(throws: PersistenceError.self) {
-            try store.delete(id: UUID())
+        await #expect(throws: PersistenceError.self) {
+            try await store.delete(id: UUID())
         }
     }
 
     @Test("Exists")
-    func exists() throws {
+    func exists() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
         let id = UUID()
-        #expect(!store.exists(id: id))
-        try store.save(SampleItem(id: id, name: "test", count: 0))
-        #expect(store.exists(id: id))
+        var result = await store.exists(id: id)
+        #expect(!result)
+        try await store.save(SampleItem(id: id, name: "test", count: 0))
+        result = await store.exists(id: id)
+        #expect(result)
     }
 
     @Test("Overwrite existing document")
-    func overwrite() throws {
+    func overwrite() async throws {
         let store = InMemoryDocumentStore<SampleItem>()
         let id = UUID()
-        try store.save(SampleItem(id: id, name: "v1", count: 1))
-        try store.save(SampleItem(id: id, name: "v2", count: 2))
-        let loaded = try store.load(id: id)
+        try await store.save(SampleItem(id: id, name: "v1", count: 1))
+        try await store.save(SampleItem(id: id, name: "v2", count: 2))
+        let loaded = try await store.load(id: id)
         #expect(loaded.name == "v2")
-        #expect(store.count == 1)
+        let count = await store.count
+        #expect(count == 1)
     }
 }
 
@@ -227,38 +235,38 @@ struct InMemoryDocumentStoreTests {
 struct InMemoryRegistryStoreTests {
 
     @Test("Load returns empty dict initially")
-    func loadEmpty() {
+    func loadEmpty() async {
         let store = InMemoryRegistryStore<SampleEntry>()
-        let registry = store.load()
+        let registry = await store.load()
         #expect(registry.isEmpty)
     }
 
     @Test("Save and load round-trip")
-    func saveAndLoad() throws {
+    func saveAndLoad() async throws {
         let store = InMemoryRegistryStore<SampleEntry>()
         let registry = [
             "key1": SampleEntry(name: "one", value: 1),
             "key2": SampleEntry(name: "two", value: 2),
         ]
-        try store.save(registry)
-        let loaded = store.load()
+        try await store.save(registry)
+        let loaded = await store.load()
         #expect(loaded == registry)
     }
 
     @Test("Pre-populated initializer")
-    func prePopulated() {
+    func prePopulated() async {
         let initial = ["key": SampleEntry(name: "init", value: 0)]
         let store = InMemoryRegistryStore(initial)
-        let loaded = store.load()
+        let loaded = await store.load()
         #expect(loaded == initial)
     }
 
     @Test("Overwrite replaces entire registry")
-    func overwrite() throws {
+    func overwrite() async throws {
         let store = InMemoryRegistryStore<SampleEntry>()
-        try store.save(["a": SampleEntry(name: "a", value: 1)])
-        try store.save(["b": SampleEntry(name: "b", value: 2)])
-        let loaded = store.load()
+        try await store.save(["a": SampleEntry(name: "a", value: 1)])
+        try await store.save(["b": SampleEntry(name: "b", value: 2)])
+        let loaded = await store.load()
         #expect(loaded.keys.contains("b"))
         #expect(!loaded.keys.contains("a"))
     }
@@ -270,20 +278,23 @@ struct InMemoryRegistryStoreTests {
 struct InMemoryKeyResolverTests {
 
     @Test("Resolves known key")
-    func resolveKnown() {
+    func resolveKnown() async {
         let resolver = InMemoryKeyResolver(["API_KEY": "sk-123"])
-        #expect(resolver.resolve("API_KEY") == "sk-123")
+        let result = await resolver.resolve("API_KEY")
+        #expect(result == "sk-123")
     }
 
     @Test("Returns nil for unknown key")
-    func resolveUnknown() {
+    func resolveUnknown() async {
         let resolver = InMemoryKeyResolver(["API_KEY": "sk-123"])
-        #expect(resolver.resolve("OTHER_KEY") == nil)
+        let result = await resolver.resolve("OTHER_KEY")
+        #expect(result == nil)
     }
 
     @Test("Empty resolver returns nil")
-    func emptyResolver() {
+    func emptyResolver() async {
         let resolver = InMemoryKeyResolver()
-        #expect(resolver.resolve("anything") == nil)
+        let result = await resolver.resolve("anything")
+        #expect(result == nil)
     }
 }
