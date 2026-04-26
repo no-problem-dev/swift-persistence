@@ -2,6 +2,43 @@ import Foundation
 import Security
 import PersistenceCore
 
+/// Keychain item の accessibility ポリシー。
+///
+/// `kSecAttrAccessible` 属性に対応する。`thisDeviceOnly` 系列は iCloud Keychain
+/// への同期を抑止し、デバイス外への credential 漏洩を防ぐ。
+public enum KeychainAccessibility: Sendable {
+    /// デバイスがアンロック中のみアクセス可能。iCloud 同期しない。
+    ///
+    /// 認証トークンや機密 credential のデフォルト推奨値 (Apple Review §2.1 整合)。
+    case whenUnlockedThisDeviceOnly
+
+    /// デバイスがアンロック中のみアクセス可能。iCloud 同期する。
+    ///
+    /// 複数デバイス間で共有したい credential 用。
+    case whenUnlocked
+
+    /// 起動後初回アンロック以降アクセス可能。iCloud 同期しない。
+    ///
+    /// バックグラウンド処理で必要な credential 用。
+    case afterFirstUnlockThisDeviceOnly
+
+    /// 起動後初回アンロック以降アクセス可能。iCloud 同期する。
+    case afterFirstUnlock
+
+    fileprivate var rawValue: CFString {
+        switch self {
+        case .whenUnlockedThisDeviceOnly:
+            return kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        case .whenUnlocked:
+            return kSecAttrAccessibleWhenUnlocked
+        case .afterFirstUnlockThisDeviceOnly:
+            return kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        case .afterFirstUnlock:
+            return kSecAttrAccessibleAfterFirstUnlock
+        }
+    }
+}
+
 /// ``SecureStore`` backed by the system Keychain.
 ///
 /// Uses `kSecClassGenericPassword` with a configurable service name.
@@ -13,18 +50,26 @@ public actor KeychainSecureStore: SecureStore {
 
     private let service: String
     private let accessGroup: String?
+    private let accessibility: KeychainAccessibility
 
     /// Creates a Keychain-backed secure store.
     ///
     /// - Parameters:
     ///   - service: Keychain service identifier. Defaults to the app's bundle identifier.
     ///   - accessGroup: Optional Keychain access group for sharing across apps/extensions.
+    ///   - accessibility: Keychain item accessibility policy. Defaults to
+    ///     ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — credentials are
+    ///     readable only while the device is unlocked and never sync to iCloud
+    ///     Keychain. This is the recommended default for auth tokens / API keys
+    ///     to satisfy Apple Review §2.1 (data protection).
     public init(
         service: String = Bundle.main.bundleIdentifier ?? "com.app.persistence",
-        accessGroup: String? = nil
+        accessGroup: String? = nil,
+        accessibility: KeychainAccessibility = .whenUnlockedThisDeviceOnly
     ) {
         self.service = service
         self.accessGroup = accessGroup
+        self.accessibility = accessibility
     }
 
     // MARK: - SecureStore
@@ -72,7 +117,10 @@ public actor KeychainSecureStore: SecureStore {
 
     public func setData(_ value: Data, forKey key: String) throws {
         let query = baseQuery(forKey: key)
-        let attributes: [String: Any] = [kSecValueData as String: value]
+        let attributes: [String: Any] = [
+            kSecValueData as String: value,
+            kSecAttrAccessible as String: accessibility.rawValue,
+        ]
 
         // Try update first
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
@@ -81,6 +129,7 @@ public actor KeychainSecureStore: SecureStore {
             // Item does not exist — add it
             var addQuery = query
             addQuery[kSecValueData as String] = value
+            addQuery[kSecAttrAccessible as String] = accessibility.rawValue
             status = SecItemAdd(addQuery as CFDictionary, nil)
         }
 
