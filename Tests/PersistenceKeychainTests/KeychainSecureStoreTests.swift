@@ -77,4 +77,32 @@ struct KeychainSecureStoreTests {
         #expect(try await store.contains(key: key))
         try await store.remove(forKey: key)
     }
+
+    @Test("Default accessibility writes successfully (whenUnlockedThisDeviceOnly)")
+    func defaultAccessibility() async throws {
+        let store = KeychainSecureStore(service: "test.persistence.\(UUID().uuidString)")
+        let key = "default_acc_\(UUID().uuidString)"
+        try await store.setString("token", forKey: key)
+        #expect(try await store.getString(forKey: key) == "token")
+        try await store.remove(forKey: key)
+    }
+
+    @Test("Configurable accessibility writes successfully")
+    func configurableAccessibility() async throws {
+        for accessibility: KeychainAccessibility in [
+            .whenUnlockedThisDeviceOnly,
+            .whenUnlocked,
+            .afterFirstUnlockThisDeviceOnly,
+            .afterFirstUnlock,
+        ] {
+            let store = KeychainSecureStore(
+                service: "test.persistence.\(UUID().uuidString)",
+                accessibility: accessibility
+            )
+            let key = "acc_\(UUID().uuidString)"
+            try await store.setString("v", forKey: key)
+            #expect(try await store.getString(forKey: key) == "v")
+            try await store.remove(forKey: key)
+        }
+    }
 }
