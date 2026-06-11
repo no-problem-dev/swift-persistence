@@ -1,12 +1,12 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``FileSystemReading`` for testing.
+/// In-memory ``FileSystemReading`` & ``FileSystemWriting`` for testing.
 ///
-/// Build a tree with ``addFile(_:string:)`` / ``addFile(_:data:)``; ancestor
-/// directories are created implicitly. Lets discovery logic be tested
-/// deterministically without touching disk.
-public actor InMemoryFileSystem: FileSystemReading {
+/// Build a tree with ``addFile(_:string:)`` / ``addFile(_:data:)`` or via the
+/// write API; ancestor directories are created implicitly. Lets discovery and
+/// authoring logic be tested deterministically without touching disk.
+public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
 
     private var files: [String: Data] = [:]
     private var directories: Set<String> = []
@@ -74,6 +74,53 @@ public actor InMemoryFileSystem: FileSystemReading {
             throw PersistenceError.notFound(key: url.path)
         }
         return data
+    }
+
+    // MARK: - FileSystemWriting
+
+    public func createDirectory(_ url: URL) throws {
+        addDirectory(url)
+    }
+
+    public func write(_ data: Data, to url: URL) throws {
+        addFile(url, data: data)
+    }
+
+    public func removeItem(_ url: URL) throws {
+        let path = Self.normalize(url)
+        let prefix = path + "/"
+        files = files.filter { $0.key != path && !$0.key.hasPrefix(prefix) }
+        directories = directories.filter { $0 != path && !$0.hasPrefix(prefix) }
+    }
+
+    public func moveItem(from source: URL, to destination: URL) throws {
+        let src = Self.normalize(source)
+        let dst = Self.normalize(destination)
+        guard files[src] != nil || directories.contains(src) else {
+            throw PersistenceError.notFound(key: source.path)
+        }
+        guard files[dst] == nil && !directories.contains(dst) else {
+            throw PersistenceError.storageFailed(
+                operation: "moveItem(\(source.path) -> \(destination.path))",
+                reason: "Destination already exists"
+            )
+        }
+        let srcPrefix = src + "/"
+        let dstPrefix = dst + "/"
+        func rebase(_ p: String) -> String {
+            p == src ? dst : dstPrefix + String(p.dropFirst(srcPrefix.count))
+        }
+        let movedFiles = files.filter { $0.key == src || $0.key.hasPrefix(srcPrefix) }
+        let movedDirs = directories.filter { $0 == src || $0.hasPrefix(srcPrefix) }
+        for (p, d) in movedFiles {
+            files[p] = nil
+            files[rebase(p)] = d
+        }
+        for p in movedDirs {
+            directories.remove(p)
+            directories.insert(rebase(p))
+        }
+        registerAncestors(of: dst)
     }
 
     // MARK: - Helpers
