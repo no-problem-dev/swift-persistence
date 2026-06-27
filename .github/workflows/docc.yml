@@ -33,7 +33,8 @@ jobs:
         run: |
           swift package --allow-writing-to-directory ./docs \
             generate-documentation \
-            --target PersistenceCore \
+            --enable-experimental-combined-documentation \
+            --target PersistenceCore --target PersistenceUserDefaults --target PersistenceKeychain --target PersistenceFileSystem --target PersistenceTesting \
             --disable-indexing \
             --transform-for-static-hosting \
             --hosting-base-path swift-persistence \
