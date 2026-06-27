@@ -11,6 +11,9 @@ let package = Package(
         .library(name: "PersistenceFileSystem", targets: ["PersistenceFileSystem"]),
         .library(name: "PersistenceTesting", targets: ["PersistenceTesting"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0"),
+    ],
     targets: [
         // Layer 0: Protocols + Error types (Foundation only)
         .target(name: "PersistenceCore"),
