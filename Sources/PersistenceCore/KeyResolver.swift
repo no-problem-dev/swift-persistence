@@ -70,12 +70,16 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         guard let mapping = keyMapping[key] else { return nil }
 
         // 2. SecureStore (Keychain)
+        // `try?` is intentional: a missing entitlement or transient Keychain error is treated
+        // as "no value at this source" so the resolver falls through gracefully to the next
+        // source rather than surfacing an unrecoverable error to the call site.
         if let value = try? await secureStore.getString(forKey: mapping.secure),
            !value.isEmpty {
             return value
         }
 
         // 3. KeyValueStore (UserDefaults — legacy fallback during migration)
+        // Same intentional `try?`: a decoding error on a stale entry silently falls through.
         if let value = try? await keyValueStore.string(forKey: mapping.keyValue),
            !value.isEmpty {
             return value

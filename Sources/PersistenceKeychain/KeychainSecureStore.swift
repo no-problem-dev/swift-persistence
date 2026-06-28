@@ -2,30 +2,31 @@ import Foundation
 import Security
 import PersistenceCore
 
-/// Keychain item の accessibility ポリシー。
+/// Keychain item accessibility policy.
 ///
-/// `kSecAttrAccessible` 属性に対応する。`thisDeviceOnly` 系列は iCloud Keychain
-/// への同期を抑止し、デバイス外への credential 漏洩を防ぐ。
+/// Maps to the `kSecAttrAccessible` attribute. The `thisDeviceOnly` variants
+/// suppress iCloud Keychain sync, preventing credential leakage off-device.
 public enum KeychainAccessibility: Sendable {
-    /// デバイスがアンロック中のみアクセス可能。iCloud 同期しない。
+    /// Accessible only while the device is unlocked. Does not sync to iCloud Keychain.
     ///
-    /// 認証トークンや機密 credential のデフォルト推奨値 (Apple Review §2.1 整合)。
+    /// Recommended default for auth tokens and sensitive credentials
+    /// (aligns with Apple Review §2.1 data-protection requirement).
     case whenUnlockedThisDeviceOnly
 
-    /// デバイスがアンロック中のみアクセス可能。iCloud 同期する。
+    /// Accessible only while the device is unlocked. Syncs to iCloud Keychain.
     ///
-    /// 複数デバイス間で共有したい credential 用。
+    /// Use when the credential must be shared across multiple devices.
     case whenUnlocked
 
-    /// 起動後初回アンロック以降アクセス可能。iCloud 同期しない。
+    /// Accessible after the first unlock following a reboot. Does not sync to iCloud Keychain.
     ///
-    /// バックグラウンド処理で必要な credential 用。
+    /// Use for credentials required by background tasks.
     case afterFirstUnlockThisDeviceOnly
 
-    /// 起動後初回アンロック以降アクセス可能。iCloud 同期する。
+    /// Accessible after the first unlock following a reboot. Syncs to iCloud Keychain.
     case afterFirstUnlock
 
-    fileprivate var rawValue: CFString {
+    var rawValue: CFString {
         switch self {
         case .whenUnlockedThisDeviceOnly:
             return kSecAttrAccessibleWhenUnlockedThisDeviceOnly
