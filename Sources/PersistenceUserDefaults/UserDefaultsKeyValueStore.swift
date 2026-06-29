@@ -1,24 +1,24 @@
 import Foundation
 import PersistenceCore
 
-/// ``KeyValueStore`` backed by `UserDefaults`.
+/// `UserDefaults` をバックエンドとする ``KeyValueStore`` 実装。
 ///
-/// Primitive types (`String`, `Bool`, `Int`, `Double`, `Data`) use
-/// UserDefaults' native accessors for efficiency. All other `Codable` types
-/// are round-tripped through `JSONEncoder`/`JSONDecoder`.
+/// プリミティブ型（`String`, `Bool`, `Int`, `Double`, `Data`）は
+/// UserDefaults のネイティブアクセサを効率的に使用する。
+/// それ以外の `Codable` 型は `JSONEncoder`/`JSONDecoder` で変換する。
 ///
-/// Implemented as an `actor` to guarantee that encoder/decoder access
-/// is data-race free and to move work off the caller's actor.
+/// アクターとして実装することでエンコーダー・デコーダーへのアクセスが
+/// データレース安全となり、呼び出し元アクターから作業を切り離す。
 public actor UserDefaultsKeyValueStore: KeyValueStore {
 
     private let defaults: UserDefaults
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// Creates a UserDefaults-backed key-value store.
+    /// UserDefaults バックドキーバリューストアを生成する。
     ///
-    /// - Parameter suiteName: Optional suite name for a shared `UserDefaults` container.
-    ///   Pass `nil` to use `.standard`.
+    /// - Parameter suiteName: 共有 `UserDefaults` コンテナのスイート名（省略可）。
+    ///   `nil` の場合は `.standard` を使用。
     public init(suiteName: String? = nil) {
         self.defaults = suiteName.flatMap { UserDefaults(suiteName: $0) } ?? .standard
         self.encoder = JSONEncoder()
@@ -26,7 +26,7 @@ public actor UserDefaultsKeyValueStore: KeyValueStore {
     }
 
     public func value<T: Codable & Sendable>(forKey key: String, type: T.Type) throws -> T? {
-        // Fast path for primitive types
+        // プリミティブ型のファストパス
         if type == String.self {
             return defaults.string(forKey: key) as? T
         }
@@ -46,7 +46,7 @@ public actor UserDefaultsKeyValueStore: KeyValueStore {
             return defaults.data(forKey: key) as? T
         }
 
-        // Codable path
+        // Codable パス
         guard let data = defaults.data(forKey: key) else { return nil }
         do {
             return try decoder.decode(T.self, from: data)
@@ -56,14 +56,14 @@ public actor UserDefaultsKeyValueStore: KeyValueStore {
     }
 
     public func setValue<T: Codable & Sendable>(_ value: T, forKey key: String) throws {
-        // Fast path for primitive types
+        // プリミティブ型のファストパス
         if let s = value as? String { defaults.set(s, forKey: key); return }
         if let b = value as? Bool { defaults.set(b, forKey: key); return }
         if let i = value as? Int { defaults.set(i, forKey: key); return }
         if let d = value as? Double { defaults.set(d, forKey: key); return }
         if let data = value as? Data { defaults.set(data, forKey: key); return }
 
-        // Codable path
+        // Codable パス
         do {
             let data = try encoder.encode(value)
             defaults.set(data, forKey: key)

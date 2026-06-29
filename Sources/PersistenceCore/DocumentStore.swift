@@ -1,36 +1,35 @@
 import Foundation
 
-/// File-based CRUD storage for identifiable Codable documents.
+/// ID を持つ `Codable` ドキュメントのファイルベース CRUD ストレージ。
 ///
-/// Each document is persisted individually (e.g., as `{id}.json`) and
-/// can be loaded, saved, listed, or deleted by ID.
+/// ドキュメントは 1 件ずつ（例: `{id}.json`）永続化され、
+/// ID による読み込み・保存・一覧取得・削除ができる。
 ///
-/// All methods are `async` so that implementations (especially file-backed ones)
-/// can perform I/O off the caller's actor (e.g., `@MainActor`).
+/// 実装はファイル I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
 ///
-/// Implementations: ``FileSystemDocumentStore``, ``InMemoryDocumentStore``.
+/// 実装: ``FileSystemDocumentStore``, ``InMemoryDocumentStore``。
 public protocol DocumentStore<Document>: Sendable {
     associatedtype Document: Codable & Identifiable & Sendable
         where Document.ID: CustomStringConvertible & Sendable
 
-    /// Saves a document, creating or overwriting it.
+    /// ドキュメントを保存する。既存の場合は上書き。
     func save(_ document: Document) async throws
 
-    /// Loads a single document by its ID.
+    /// ID を指定してドキュメントを 1 件読み込む。
     ///
-    /// - Throws: ``PersistenceError/notFound(key:)`` if no document with the given ID exists.
+    /// - Throws: 該当 ID のドキュメントが存在しない場合は ``PersistenceError/notFound(key:)``。
     func load(id: Document.ID) async throws -> Document
 
-    /// Loads all documents.
+    /// 全ドキュメントを読み込む。
     ///
-    /// Returns an empty array if no documents exist.
+    /// ドキュメントが 1 件もない場合は空配列を返す。
     func loadAll() async throws -> [Document]
 
-    /// Deletes a document by ID.
+    /// ID を指定してドキュメントを削除する。
     ///
-    /// - Throws: ``PersistenceError/notFound(key:)`` if no document with the given ID exists.
+    /// - Throws: 該当 ID のドキュメントが存在しない場合は ``PersistenceError/notFound(key:)``。
     func delete(id: Document.ID) async throws
 
-    /// Returns `true` if a document with the given ID exists.
+    /// 指定 ID のドキュメントが存在する場合に `true` を返す。
     func exists(id: Document.ID) async -> Bool
 }

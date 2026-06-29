@@ -2,28 +2,28 @@ import Foundation
 import Security
 import PersistenceCore
 
-/// Keychain item accessibility policy.
+/// Keychain アイテムのアクセシビリティポリシー。
 ///
-/// Maps to the `kSecAttrAccessible` attribute. The `thisDeviceOnly` variants
-/// suppress iCloud Keychain sync, preventing credential leakage off-device.
+/// `kSecAttrAccessible` 属性にマッピングされる。`thisDeviceOnly` バリアントは
+/// iCloud Keychain 同期を抑制し、クレデンシャルのデバイス外への漏洩を防ぐ。
 public enum KeychainAccessibility: Sendable {
-    /// Accessible only while the device is unlocked. Does not sync to iCloud Keychain.
+    /// デバイスのロック解除中のみアクセス可能。iCloud Keychain に同期しない。
     ///
-    /// Recommended default for auth tokens and sensitive credentials
-    /// (aligns with Apple Review §2.1 data-protection requirement).
+    /// 認証トークン・機密クレデンシャルの推奨デフォルト
+    /// （Apple Review §2.1 データ保護要件に準拠）。
     case whenUnlockedThisDeviceOnly
 
-    /// Accessible only while the device is unlocked. Syncs to iCloud Keychain.
+    /// デバイスのロック解除中のみアクセス可能。iCloud Keychain に同期する。
     ///
-    /// Use when the credential must be shared across multiple devices.
+    /// 複数デバイス間でクレデンシャルを共有する必要がある場合に使用。
     case whenUnlocked
 
-    /// Accessible after the first unlock following a reboot. Does not sync to iCloud Keychain.
+    /// 再起動後の初回ロック解除以降アクセス可能。iCloud Keychain に同期しない。
     ///
-    /// Use for credentials required by background tasks.
+    /// バックグラウンドタスクが必要とするクレデンシャルに使用。
     case afterFirstUnlockThisDeviceOnly
 
-    /// Accessible after the first unlock following a reboot. Syncs to iCloud Keychain.
+    /// 再起動後の初回ロック解除以降アクセス可能。iCloud Keychain に同期する。
     case afterFirstUnlock
 
     var rawValue: CFString {
@@ -40,29 +40,28 @@ public enum KeychainAccessibility: Sendable {
     }
 }
 
-/// ``SecureStore`` backed by the system Keychain.
+/// システム Keychain をバックエンドとする ``SecureStore`` 実装。
 ///
-/// Uses `kSecClassGenericPassword` with a configurable service name.
-/// Each key is stored as a separate Keychain item with the key as the account attribute.
+/// `kSecClassGenericPassword` と設定可能なサービス名を使用する。
+/// 各キーはアカウント属性にキーを設定した独立した Keychain アイテムとして格納される。
 ///
-/// Implemented as an `actor` to move Keychain IPC off the caller's actor
-/// and to provide data-race safety.
+/// アクターとして実装することで、Keychain IPC を呼び出し元アクターから切り離し、
+/// データレース安全性を確保する。
 public actor KeychainSecureStore: SecureStore {
 
     private let service: String
     private let accessGroup: String?
     private let accessibility: KeychainAccessibility
 
-    /// Creates a Keychain-backed secure store.
+    /// Keychain バックドセキュアストアを生成する。
     ///
     /// - Parameters:
-    ///   - service: Keychain service identifier. Defaults to the app's bundle identifier.
-    ///   - accessGroup: Optional Keychain access group for sharing across apps/extensions.
-    ///   - accessibility: Keychain item accessibility policy. Defaults to
-    ///     ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — credentials are
-    ///     readable only while the device is unlocked and never sync to iCloud
-    ///     Keychain. This is the recommended default for auth tokens / API keys
-    ///     to satisfy Apple Review §2.1 (data protection).
+    ///   - service: Keychain サービス識別子。デフォルトはアプリのバンドル識別子。
+    ///   - accessGroup: アプリ・エクステンション間の Keychain 共有に使うアクセスグループ（省略可）。
+    ///   - accessibility: Keychain アイテムのアクセシビリティポリシー。デフォルトは
+    ///     ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — デバイスのロック解除中のみ
+    ///     読み取り可能で iCloud Keychain に同期しない。認証トークン・API キーの推奨デフォルト
+    ///     （Apple Review §2.1 データ保護に準拠）。
     public init(
         service: String = Bundle.main.bundleIdentifier ?? "com.app.persistence",
         accessGroup: String? = nil,
@@ -123,11 +122,11 @@ public actor KeychainSecureStore: SecureStore {
             kSecAttrAccessible as String: accessibility.rawValue,
         ]
 
-        // Try update first
+        // まず更新を試みる
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
 
         if status == errSecItemNotFound {
-            // Item does not exist — add it
+            // アイテムが存在しない場合は追加する
             var addQuery = query
             addQuery[kSecValueData as String] = value
             addQuery[kSecAttrAccessible as String] = accessibility.rawValue

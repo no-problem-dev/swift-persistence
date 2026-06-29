@@ -1,11 +1,11 @@
 import Foundation
 import PersistenceCore
 
-/// ``FileSystemReading`` backed by `FileManager`.
+/// `FileManager` をバックエンドとする ``FileSystemReading`` 実装。
 ///
-/// Reads from the real local filesystem. `FileManager.default` is safe for the
-/// concurrent read operations used here, so this is a value type rather than an
-/// actor.
+/// 実際のローカルファイルシステムを参照する。`FileManager.default` は
+/// ここで使用する並行読み取り操作に対してスレッドセーフなので、
+/// アクターではなく値型として実装する。
 public struct FoundationFileSystem: FileSystemReading {
 
     public init() {}

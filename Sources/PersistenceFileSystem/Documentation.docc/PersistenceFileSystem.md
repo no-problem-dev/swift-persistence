@@ -1,14 +1,14 @@
 # ``PersistenceFileSystem``
 
-File-system-backed ``DocumentStore``, ``RegistryStore``, and ``FileSystemReading``/``FileSystemWriting`` implementations for disk persistence.
+ディスク永続化のための ``DocumentStore``・``RegistryStore``・``FileSystemReading``/``FileSystemWriting`` 実装。
 
 ## Overview
 
-`PersistenceFileSystem` provides three concrete types that cover the most common patterns for persisting data to the local file system.
+`PersistenceFileSystem` はローカルファイルシステムへのデータ永続化として最も一般的なパターンをカバーする 3 つの具体型を提供する。
 
-### Document Store
+### ドキュメントストア
 
-`FileSystemDocumentStore` persists each `Identifiable & Codable` document as a separate `{id}.json` file inside a configured directory. Writes are atomic to prevent corruption, and the directory is created automatically on first use. It is the right choice when you need per-entity CRUD on disk — user profiles, notes, cached model metadata, or any collection of independently loadable records:
+`FileSystemDocumentStore` は各 `Identifiable & Codable` ドキュメントを設定ディレクトリ内の独立した `{id}.json` ファイルとして永続化する。書き込みはアトミックで破損を防ぎ、ディレクトリは初回使用時に自動作成する。ユーザープロフィール・ノート・キャッシュ済みモデルメタデータなど、独立して読み込めるレコードのコレクションにディスク上での CRUD が必要な場合に適している:
 
 ```swift
 import PersistenceFileSystem
@@ -23,21 +23,21 @@ let store = try FileSystemDocumentStore<Note>(
     directory: URL.documentsDirectory.appendingPathComponent("notes")
 )
 
-// Create or overwrite
-let note = Note(id: UUID(), title: "Meeting notes", body: "…")
+// 作成または上書き
+let note = Note(id: UUID(), title: "ミーティングノート", body: "…")
 try await store.save(note)
 
-// Load one or all
+// 1 件または全件読み込み
 let loaded = try await store.load(id: note.id)
 let all: [Note] = try await store.loadAll()
 
-// Delete
+// 削除
 try await store.delete(id: note.id)
 ```
 
-### Registry Store
+### レジストリストア
 
-`FileSystemRegistryStore` persists an entire `[String: Codable]` dictionary to a single JSON file using atomic writes. It is designed for the registry pattern — a single file that maps string keys to lightweight metadata entries such as download records, cache manifests, or adapter indexes:
+`FileSystemRegistryStore` は `[String: Codable]` 辞書全体をアトミック書き込みで単一 JSON ファイルに永続化する。文字列キーをダウンロード記録・キャッシュマニフェスト・アダプタインデックスなどの軽量メタデータエントリにマッピングするレジストリパターン向けの設計:
 
 ```swift
 import PersistenceFileSystem
@@ -51,15 +51,15 @@ let registry = FileSystemRegistryStore<ModelRecord>(
     directory: URL.cachesDirectory.appendingPathComponent("models")
 )
 
-// The consuming actor holds the dictionary and calls save after mutations
+// 消費側アクターが辞書を保持し、更新後に save を呼ぶ
 var entries = await registry.load()
 entries["llama-3b"] = ModelRecord(downloadedAt: .now, sizeBytes: 1_800_000_000)
 try await registry.save(entries)
 ```
 
-### File System
+### ファイルシステム
 
-`FoundationFileSystem` wraps `FileManager` and conforms to both ``FileSystemReading`` and ``FileSystemWriting``. Unlike `FileSystemDocumentStore` and `FileSystemRegistryStore`, it operates at the raw file-tree level — checking existence, listing directory contents, reading arbitrary `Data`, creating directories, writing atomically, deleting, and moving items. Use it when your code needs to traverse or author a tree of files rather than work with typed documents:
+`FoundationFileSystem` は `FileManager` をラップし ``FileSystemReading`` と ``FileSystemWriting`` の両方に準拠する。`FileSystemDocumentStore` や `FileSystemRegistryStore` と異なり、生のファイルツリーレベルで動作する — 存在確認・ディレクトリ内容一覧・任意の `Data` 読み込み・ディレクトリ作成・アトミック書き込み・削除・移動。型付きドキュメントを扱うのではなく、ファイルのツリーを走査・生成する必要がある場合に使用する:
 
 ```swift
 import PersistenceFileSystem
@@ -67,27 +67,27 @@ import PersistenceFileSystem
 let fs = FoundationFileSystem()
 let root = URL.documentsDirectory.appendingPathComponent("skills")
 
-// Read-side traversal
+// 読み取り側の走査
 let items = try await fs.contentsOfDirectory(root)
 for item in items where await fs.isDirectory(item) {
     let markdown = try await fs.readString(item.appendingPathComponent("README.md"))
-    // process markdown…
+    // markdown を処理…
 }
 
-// Write-side authoring
+// 書き込み側の生成
 let dest = root.appendingPathComponent("new-skill/SKILL.md")
-try await fs.write("# New Skill\n", to: dest)   // parent directories created automatically
+try await fs.write("# New Skill\n", to: dest)   // 親ディレクトリは自動作成
 ```
 
-In test targets, replace all three types with `InMemoryDocumentStore`, `InMemoryRegistryStore`, and `InMemoryFileSystem` from `PersistenceTesting`. Each in-memory double conforms to the same protocol as its file-backed counterpart, so no production code needs to change.
+テストターゲットでは、`PersistenceTesting` の `InMemoryDocumentStore`・`InMemoryRegistryStore`・`InMemoryFileSystem` で 3 つの型を全て置き換える。各インメモリダブルはファイルバックド版と同じプロトコルに準拠するため、プロダクションコードの変更は不要。
 
 ## Topics
 
-### Document and Registry Storage
+### ドキュメント・レジストリストレージ
 
 - ``FileSystemDocumentStore``
 - ``FileSystemRegistryStore``
 
-### File System
+### ファイルシステム
 
 - ``FoundationFileSystem``

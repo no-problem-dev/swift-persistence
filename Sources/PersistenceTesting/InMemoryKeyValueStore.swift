@@ -1,10 +1,9 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``KeyValueStore`` for testing.
+/// テスト用のインメモリ ``KeyValueStore``。
 ///
-/// Actor isolation replaces manual `NSLock` synchronization,
-/// providing data-race safety with cleaner code.
+/// アクター分離によりロック同期を置き換え、データレース安全を実現する。
 public actor InMemoryKeyValueStore: KeyValueStore {
 
     private var storage: [String: Data] = [:]
@@ -16,7 +15,7 @@ public actor InMemoryKeyValueStore: KeyValueStore {
         self.decoder = JSONDecoder()
     }
 
-    /// Creates an in-memory store pre-populated with the given values.
+    /// 指定した値で初期状態を持つインメモリストアを生成する。
     public init(_ initial: [String: any Codable & Sendable]) {
         let encoder = JSONEncoder()
         self.encoder = encoder
@@ -54,7 +53,7 @@ public actor InMemoryKeyValueStore: KeyValueStore {
         storage[key] != nil
     }
 
-    /// Returns the number of stored entries (for test assertions).
+    /// 格納エントリ数（テストアサーション用）。
     public var count: Int {
         storage.count
     }
@@ -62,7 +61,7 @@ public actor InMemoryKeyValueStore: KeyValueStore {
 
 // MARK: - CodableWrapper
 
-/// Helper to encode `any Codable` values for initial population.
+/// 初期値エンコード用の `any Codable` ラッパー。
 private struct CodableWrapper: Encodable {
     private let encode: (Encoder) throws -> Void
 

@@ -1,11 +1,11 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``FileSystemReading`` & ``FileSystemWriting`` for testing.
+/// テスト用のインメモリ ``FileSystemReading`` & ``FileSystemWriting``。
 ///
-/// Build a tree with ``addFile(_:string:)`` / ``addFile(_:data:)`` or via the
-/// write API; ancestor directories are created implicitly. Lets discovery and
-/// authoring logic be tested deterministically without touching disk.
+/// ``addFile(_:string:)`` / ``addFile(_:data:)`` またはライト API でツリーを構築する。
+/// 先祖ディレクトリは暗黙的に作成される。
+/// ディスクに触れることなく探索・生成ロジックを決定的にテストできる。
 public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
 
     private var files: [String: Data] = [:]
@@ -15,19 +15,19 @@ public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
 
     // MARK: - Building the tree
 
-    /// Adds a file with raw bytes, registering all ancestor directories.
+    /// 生バイトのファイルを追加し、全先祖ディレクトリを登録する。
     public func addFile(_ url: URL, data: Data) {
         let path = Self.normalize(url)
         files[path] = data
         registerAncestors(of: path)
     }
 
-    /// Adds a file from a UTF-8 string.
+    /// UTF-8 文字列からファイルを追加する。
     public func addFile(_ url: URL, string: String) {
         addFile(url, data: Data(string.utf8))
     }
 
-    /// Adds an empty directory, registering all ancestor directories.
+    /// 空ディレクトリを追加し、全先祖ディレクトリを登録する。
     public func addDirectory(_ url: URL) {
         let path = Self.normalize(url)
         directories.insert(path)

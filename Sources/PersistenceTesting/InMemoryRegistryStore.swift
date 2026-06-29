@@ -1,17 +1,17 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``RegistryStore`` for testing.
+/// テスト用のインメモリ ``RegistryStore``。
 ///
-/// Actor isolation replaces manual `NSLock` synchronization.
-/// Simulates the JSON registry file pattern.
+/// アクター分離によりロック同期を置き換える。
+/// JSON レジストリファイルパターンをシミュレートする。
 public actor InMemoryRegistryStore<Entry: Codable & Sendable>: RegistryStore {
 
     private var registry: [String: Entry] = [:]
 
     public init() {}
 
-    /// Creates a pre-populated registry store.
+    /// 初期状態を持つレジストリストアを生成する。
     public init(_ initial: [String: Entry]) {
         self.registry = initial
     }
@@ -24,7 +24,7 @@ public actor InMemoryRegistryStore<Entry: Codable & Sendable>: RegistryStore {
         self.registry = registry
     }
 
-    /// Returns the number of entries (for test assertions).
+    /// エントリ数（テストアサーション用）。
     public var count: Int {
         registry.count
     }

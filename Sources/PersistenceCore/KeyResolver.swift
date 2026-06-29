@@ -1,32 +1,32 @@
 import Foundation
 
-/// Resolves a value by trying multiple sources in priority order.
+/// 複数のソースを優先順位順に試して値を解決するリゾルバ。
 ///
-/// Abstracts the common pattern of checking Info.plist, then Keychain,
-/// then UserDefaults for a configuration value.
+/// Info.plist → Keychain → UserDefaults の順に設定値を探す
+/// 一般的なパターンを抽象化する。
 ///
-/// Implementations: ``ChainedKeyResolver``, ``InMemoryKeyResolver``.
+/// 実装: ``ChainedKeyResolver``, ``InMemoryKeyResolver``。
 public protocol KeyResolver: Sendable {
 
-    /// Resolves a string value for the given logical key.
+    /// 指定の論理キーに対して文字列値を解決する。
     ///
-    /// - Returns: The resolved value, or `nil` if no source has a value.
+    /// - Returns: 解決した値。どのソースにも値がない場合は `nil`。
     func resolve(_ key: String) async -> String?
 }
 
-/// Resolves values by checking sources in order: Info.plist → SecureStore → KeyValueStore.
+/// Info.plist → SecureStore → KeyValueStore の順に値を解決するリゾルバ。
 public struct ChainedKeyResolver: KeyResolver, Sendable {
 
     private let infoPlistLookup: @Sendable (String) -> String?
     private let secureStore: any SecureStore
     private let keyValueStore: any KeyValueStore
 
-    /// Maps logical key names to their storage keys in each store.
+    /// 論理キー名を各ストアでの実ストレージキーにマッピングする辞書。
     ///
-    /// Example: `"ANTHROPIC_API_KEY"` → `(secure: "anthropic_api_key", kv: "anthropic_api_key")`
+    /// 例: `"ANTHROPIC_API_KEY"` → `(secure: "anthropic_api_key", kv: "anthropic_api_key")`
     private let keyMapping: [String: StorageKeys]
 
-    /// Storage key pair for a logical key.
+    /// 論理キーに対応する各ストアでの実ストレージキーのペア。
     public struct StorageKeys: Sendable {
         public let secure: String
         public let keyValue: String
@@ -37,14 +37,14 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         }
     }
 
-    /// Creates a chained key resolver.
+    /// チェーンドキーリゾルバを生成する。
     ///
     /// - Parameters:
-    ///   - infoPlistLookup: Closure to look up values in Info.plist.
-    ///     Defaults to `Bundle.main.infoDictionary` lookup.
-    ///   - secureStore: Secure storage (Keychain) to check second.
-    ///   - keyValueStore: Key-value storage (UserDefaults) to check last (migration fallback).
-    ///   - keyMapping: Maps logical key names to their storage keys.
+    ///   - infoPlistLookup: Info.plist から値を参照するクロージャ。
+    ///     デフォルトは `Bundle.main.infoDictionary` 参照。
+    ///   - secureStore: 2 番目に参照するセキュアストレージ（Keychain）。
+    ///   - keyValueStore: 最後に参照するキーバリューストレージ（UserDefaults、マイグレーション用フォールバック）。
+    ///   - keyMapping: 論理キー名を各ストアのキーにマッピングする辞書。
     public init(
         infoPlistLookup: @escaping @Sendable (String) -> String? = { key in
             Bundle.main.infoDictionary?[key] as? String
@@ -60,7 +60,7 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
     }
 
     public func resolve(_ key: String) async -> String? {
-        // 1. Info.plist (build-time injection via xcconfig)
+        // 1. Info.plist (xcconfig 経由のビルド時注入)
         if let value = infoPlistLookup(key),
            !value.isEmpty,
            !value.hasPrefix("$(") {
@@ -70,16 +70,15 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         guard let mapping = keyMapping[key] else { return nil }
 
         // 2. SecureStore (Keychain)
-        // `try?` is intentional: a missing entitlement or transient Keychain error is treated
-        // as "no value at this source" so the resolver falls through gracefully to the next
-        // source rather than surfacing an unrecoverable error to the call site.
+        // `try?` は意図的: エンタイトルメント不足や一時的な Keychain エラーは
+        // 「このソースに値なし」として扱い、次のソースへグレースフルにフォールスルーさせる。
         if let value = try? await secureStore.getString(forKey: mapping.secure),
            !value.isEmpty {
             return value
         }
 
-        // 3. KeyValueStore (UserDefaults — legacy fallback during migration)
-        // Same intentional `try?`: a decoding error on a stale entry silently falls through.
+        // 3. KeyValueStore (UserDefaults — マイグレーション中のレガシーフォールバック)
+        // 同様に意図的な `try?`: 古いエントリのデコードエラーもサイレントにフォールスルー。
         if let value = try? await keyValueStore.string(forKey: mapping.keyValue),
            !value.isEmpty {
             return value

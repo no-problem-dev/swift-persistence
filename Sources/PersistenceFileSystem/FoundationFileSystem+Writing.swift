@@ -1,7 +1,7 @@
 import Foundation
 import PersistenceCore
 
-/// ``FileSystemWriting`` backed by `FileManager`, mirroring the read side.
+/// `FileManager` をバックエンドとする ``FileSystemWriting`` 実装。読み取り側と対になる。
 extension FoundationFileSystem: FileSystemWriting {
 
     public func createDirectory(_ url: URL) async throws {

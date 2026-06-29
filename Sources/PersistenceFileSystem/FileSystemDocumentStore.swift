@@ -1,13 +1,13 @@
 import Foundation
 import PersistenceCore
 
-/// ``DocumentStore`` backed by individual JSON files on disk.
+/// 個別の JSON ファイルでドキュメントを永続化する ``DocumentStore`` 実装。
 ///
-/// Each document is saved as `{id}.json` in the configured directory.
-/// All file writes are atomic to prevent corruption.
+/// ドキュメントは設定ディレクトリ内の `{id}.json` として保存される。
+/// 全ファイル書き込みはアトミックで、データ破損を防ぐ。
 ///
-/// Implemented as an `actor` so that file I/O is automatically moved
-/// off the caller's actor (e.g., `@MainActor`) via actor hop.
+/// アクターとして実装することで、ファイル I/O を
+/// 呼び出し元アクター（例: `@MainActor`）からアクターホップで自動的に切り離す。
 public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore
     where T.ID: CustomStringConvertible & Sendable
 {
@@ -17,14 +17,13 @@ public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: Docu
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// Creates a file-system document store.
+    /// ファイルシステムドキュメントストアを生成する。
     ///
     /// - Parameters:
-    ///   - directory: The directory to store document files. Created if it doesn't exist.
-    ///   - encoder: Custom JSON encoder. Defaults to ISO 8601 dates, pretty-printed, sorted keys.
-    ///   - decoder: Custom JSON decoder. Defaults to ISO 8601 dates.
-    /// - Throws: ``PersistenceError/directoryCreationFailed(path:reason:)`` if the directory
-    ///   cannot be created.
+    ///   - directory: ドキュメントファイルを格納するディレクトリ。存在しない場合は作成する。
+    ///   - encoder: カスタム JSON エンコーダー。デフォルトは ISO 8601 日付・プリティプリント・ソートキー。
+    ///   - decoder: カスタム JSON デコーダー。デフォルトは ISO 8601 日付。
+    /// - Throws: ディレクトリを作成できない場合は ``PersistenceError/directoryCreationFailed(path:reason:)``。
     public init(
         directory: URL,
         encoder: JSONEncoder? = nil,

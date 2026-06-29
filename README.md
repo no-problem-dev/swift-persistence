@@ -1,24 +1,24 @@
-[English](README_EN.md) | 日本語
+English | [日本語](./README.ja.md)
 
 # SwiftPersistence
 
-プロトコル指向の永続化抽象レイヤー Swift パッケージ
+A protocol-oriented persistence abstraction layer for Swift
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## 特徴
+## Features
 
-- **プロトコル指向** - 全永続化操作を抽象プロトコルで定義、DI でテスト容易な設計
-- **KeyValueStore** - UserDefaults の型安全な抽象化（Codable 対応）
-- **SecureStore** - Keychain の安全なラッパー（API キー・認証情報の保護）
-- **DocumentStore** - ファイルベース CRUD（JSON 個別ファイル、atomic write）
-- **RegistryStore** - 単一 JSON ファイルによるレジストリパターン
-- **KeyResolver** - Info.plist → Keychain → UserDefaults の多段フォールバック値解決
-- **テスト用 InMemory 実装** - 全プロトコルの InMemory 実装をバンドル
+- **Protocol-Oriented** - All persistence operations defined as abstract protocols for DI and testability
+- **KeyValueStore** - Type-safe UserDefaults abstraction (Codable support)
+- **SecureStore** - Safe Keychain wrapper (API key and credential protection)
+- **DocumentStore** - File-based CRUD (individual JSON files, atomic writes)
+- **RegistryStore** - Single JSON file registry pattern
+- **KeyResolver** - Multi-source fallback resolution: Info.plist → Keychain → UserDefaults
+- **InMemory Test Doubles** - Bundled InMemory implementations for all protocols
 
-## インストール
+## Installation
 
 ```swift
 // Package.swift
@@ -27,53 +27,53 @@ dependencies: [
 ]
 ```
 
-### モジュール構成
+### Module Structure
 
-用途に応じて必要なモジュールのみをインポートできます：
+Import only the modules you need:
 
-| モジュール | 用途 |
-|-----------|------|
-| `PersistenceCore` | プロトコル + エラー型（Foundation のみ、外部依存なし） |
-| `PersistenceUserDefaults` | UserDefaults ベースの KeyValueStore 実装 |
-| `PersistenceKeychain` | Keychain ベースの SecureStore 実装 |
-| `PersistenceFileSystem` | ファイルベースの DocumentStore / RegistryStore 実装 |
-| `PersistenceTesting` | InMemory 実装 5 種（テスト用 DI） |
+| Module | Purpose |
+|--------|---------|
+| `PersistenceCore` | Protocols + error types (Foundation only, no external dependencies) |
+| `PersistenceUserDefaults` | UserDefaults-backed KeyValueStore implementation |
+| `PersistenceKeychain` | Keychain-backed SecureStore implementation |
+| `PersistenceFileSystem` | File-backed DocumentStore / RegistryStore implementations |
+| `PersistenceTesting` | 5 InMemory implementations (test DI doubles) |
 
-## クイックスタート
+## Quick Start
 
-### キーバリューストア（UserDefaults 抽象）
+### Key-Value Store (UserDefaults Abstraction)
 
 ```swift
 import PersistenceUserDefaults
 
 let store = UserDefaultsKeyValueStore()
 
-// Codable 値の保存・取得
-try store.setValue("dark", forKey: "theme")
-let theme: String? = try store.string(forKey: "theme")
+// Save and retrieve Codable values
+try await store.setValue("dark", forKey: "theme")
+let theme: String? = try await store.string(forKey: "theme")
 
-// カスタム型も対応
+// Custom types supported
 struct UserPrefs: Codable, Sendable {
     var fontSize: Int
     var language: String
 }
-try store.setValue(UserPrefs(fontSize: 14, language: "ja"), forKey: "prefs")
-let prefs: UserPrefs? = try store.value(forKey: "prefs", type: UserPrefs.self)
+try await store.setValue(UserPrefs(fontSize: 14, language: "en"), forKey: "prefs")
+let prefs: UserPrefs? = try await store.value(forKey: "prefs", type: UserPrefs.self)
 ```
 
-### セキュアストア（Keychain 抽象）
+### Secure Store (Keychain Abstraction)
 
 ```swift
 import PersistenceKeychain
 
 let secrets = KeychainSecureStore(service: "com.example.myapp")
 
-// API キーを安全に保存
-try secrets.setString("sk-abc123...", forKey: "api_key")
-let key = try secrets.getString(forKey: "api_key")
+// Securely store API keys
+try await secrets.setString("sk-abc123...", forKey: "api_key")
+let key = try await secrets.getString(forKey: "api_key")
 ```
 
-### ドキュメントストア（ファイルベース CRUD）
+### Document Store (File-based CRUD)
 
 ```swift
 import PersistenceFileSystem
@@ -88,14 +88,14 @@ let store = try FileSystemDocumentStore<Note>(
     directory: documentsURL.appendingPathComponent("notes")
 )
 
-// CRUD 操作
-let note = Note(id: UUID(), title: "メモ", body: "内容")
-try store.save(note)
-let all = try store.loadAll()
-try store.delete(id: note.id)
+// CRUD operations
+let note = Note(id: UUID(), title: "Memo", body: "Content")
+try await store.save(note)
+let all = try await store.loadAll()
+try await store.delete(id: note.id)
 ```
 
-### レジストリストア（単一 JSON レジストリ）
+### Registry Store (Single JSON Registry)
 
 ```swift
 import PersistenceFileSystem
@@ -110,12 +110,12 @@ let registry = FileSystemRegistryStore<CacheEntry>(
     filename: "registry.json"
 )
 
-var entries = registry.load()
+var entries = await registry.load()
 entries["model-v1"] = CacheEntry(version: "1.0", downloadedAt: Date())
-try registry.save(entries)
+try await registry.save(entries)
 ```
 
-### 多段フォールバック値解決
+### Multi-Source Fallback Resolution
 
 ```swift
 import PersistenceCore
@@ -130,16 +130,16 @@ let resolver = ChainedKeyResolver(
     ]
 )
 
-// Info.plist → Keychain → UserDefaults の順に探索
-let apiKey = resolver.resolve("API_KEY")
+// Searches in order: Info.plist → Keychain → UserDefaults
+let apiKey = await resolver.resolve("API_KEY")
 ```
 
-### テスト用 InMemory 実装
+### InMemory Test Doubles
 
 ```swift
 import PersistenceTesting
 
-// テストで DI 注入
+// Inject via DI in tests
 let mockStore = InMemoryKeyValueStore()
 let mockSecrets = InMemorySecureStore()
 let mockDocs = InMemoryDocumentStore<Note>()
@@ -147,33 +147,33 @@ let mockDocs = InMemoryDocumentStore<Note>()
 let settings = AppSettings(
     preferences: mockStore,
     secrets: mockSecrets,
-    keyResolver: InMemoryKeyResolver(values: ["API_KEY": "test-key"])
+    keyResolver: InMemoryKeyResolver(["API_KEY": "test-key"])
 )
 ```
 
-## アーキテクチャ
+## Architecture
 
-2 層構造で関心の分離を実現しています：
+2-layer architecture for separation of concerns:
 
 ```
-Layer 0: PersistenceCore           プロトコル + エラー型（外部依存なし）
-Layer 1: PersistenceUserDefaults   UserDefaults 具象実装
-         PersistenceKeychain       Keychain 具象実装
-         PersistenceFileSystem     ファイルシステム具象実装
-         PersistenceTesting        InMemory テストダブル
+Layer 0: PersistenceCore           Protocols + error types (no external dependencies)
+Layer 1: PersistenceUserDefaults   UserDefaults concrete implementation
+         PersistenceKeychain       Keychain concrete implementation
+         PersistenceFileSystem     File system concrete implementation
+         PersistenceTesting        InMemory test doubles
 ```
 
-## 要件
+## Requirements
 
 - iOS 17.0+ / macOS 14.0+
 - Swift 6.2+
 - Xcode 16.0+
 
-## ライセンス
+## License
 
-MIT License - 詳細は [LICENSE](LICENSE) を参照
+MIT License - See [LICENSE](LICENSE) for details
 
-## リンク
+## Links
 
-- [Issue報告](https://github.com/no-problem-dev/swift-persistence/issues)
-- [ディスカッション](https://github.com/no-problem-dev/swift-persistence/discussions)
+- [Report Issues](https://github.com/no-problem-dev/swift-persistence/issues)
+- [Discussions](https://github.com/no-problem-dev/swift-persistence/discussions)

@@ -1,11 +1,10 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``SecureStore`` for testing.
+/// テスト用のインメモリ ``SecureStore``。
 ///
-/// Actor isolation replaces manual `NSLock` synchronization,
-/// simulating Keychain behavior without requiring entitlements
-/// or a real Keychain.
+/// アクター分離によりロック同期を置き換え、
+/// エンタイトルメントや実 Keychain なしで Keychain の挙動をシミュレートする。
 public actor InMemorySecureStore: SecureStore {
 
     private var storage: [String: Data] = [:]
@@ -49,7 +48,7 @@ public actor InMemorySecureStore: SecureStore {
         storage[key] != nil
     }
 
-    /// Returns the number of stored entries (for test assertions).
+    /// 格納エントリ数（テストアサーション用）。
     public var count: Int {
         storage.count
     }

@@ -1,30 +1,30 @@
 import Foundation
 import PersistenceCore
 
-/// ``RegistryStore`` backed by a single JSON file on disk.
+/// 単一の JSON ファイルでレジストリを永続化する ``RegistryStore`` 実装。
 ///
-/// Generalizes the registry pattern where a single JSON file maps
-/// string keys to Codable metadata entries. The file is read/written
-/// atomically.
+/// 文字列キーから `Codable` メタデータエントリへのマッピングを
+/// 単一 JSON ファイルで管理するレジストリパターンを汎化する。
+/// ファイルの読み書きはアトミックに行う。
 ///
-/// Implemented as an `actor` so that file I/O is automatically moved
-/// off the caller's actor (e.g., `@MainActor`) via actor hop.
+/// アクターとして実装することで、ファイル I/O を
+/// 呼び出し元アクター（例: `@MainActor`）からアクターホップで自動的に切り離す。
 public actor FileSystemRegistryStore<Entry: Codable & Sendable>: RegistryStore {
 
     private let registryURL: URL
 
-    /// Creates a file-system registry store from a full file URL.
+    /// ファイル URL 指定でファイルシステムレジストリストアを生成する。
     ///
-    /// - Parameter registryURL: Full path to the JSON registry file.
+    /// - Parameter registryURL: JSON レジストリファイルのフルパス。
     public init(registryURL: URL) {
         self.registryURL = registryURL
     }
 
-    /// Creates a file-system registry store from a directory and filename.
+    /// ディレクトリとファイル名指定でファイルシステムレジストリストアを生成する。
     ///
     /// - Parameters:
-    ///   - directory: The directory containing the registry file.
-    ///   - filename: The registry filename. Defaults to `"registry.json"`.
+    ///   - directory: レジストリファイルを含むディレクトリ。
+    ///   - filename: レジストリファイル名。デフォルトは `"registry.json"`。
     public init(directory: URL, filename: String = "registry.json") {
         self.registryURL = directory.appendingPathComponent(filename)
     }

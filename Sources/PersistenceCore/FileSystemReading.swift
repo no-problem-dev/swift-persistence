@@ -1,45 +1,41 @@
 import Foundation
 
-/// Read-only filesystem traversal abstraction.
+/// 読み取り専用のファイルシステムツリー走査抽象。
 ///
-/// Generalizes the directory-walking and file-reading needed by consumers that
-/// scan a tree for files (e.g. discovering `SKILL.md` files under skill roots),
-/// without binding them to `FileManager`. This keeps such consumers testable
-/// against an in-memory tree and swappable for sandboxed or remote backends.
+/// `FileManager` に依存せず、ディレクトリ走査とファイル読み取りが
+/// 必要な消費側コード（例: スキルルート配下の `SKILL.md` 探索）を
+/// テスト容易にし、サンドボックスやリモートバックエンドへの差し替えを可能にする。
 ///
-/// Unlike ``DocumentStore`` (keyed CRUD) and ``RegistryStore`` (single keyed
-/// file), this models raw tree traversal: existence, directory listing, and
-/// byte reads.
+/// ``DocumentStore``（キード CRUD）・``RegistryStore``（単一キードファイル）と異なり、
+/// 存在確認・ディレクトリ一覧・バイト読み取りというツリー走査操作をモデル化する。
 ///
-/// All methods are `async` so file-backed implementations can move I/O off the
-/// caller's actor.
+/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
 ///
-/// Implementations: ``FoundationFileSystem``, ``InMemoryFileSystem``.
+/// 実装: ``FoundationFileSystem``, ``InMemoryFileSystem``。
 public protocol FileSystemReading: Sendable {
 
-    /// Returns `true` if a file or directory exists at `url`.
+    /// 指定 URL にファイルまたはディレクトリが存在する場合に `true` を返す。
     func exists(_ url: URL) async -> Bool
 
-    /// Returns `true` if a directory exists at `url`.
+    /// 指定 URL にディレクトリが存在する場合に `true` を返す。
     func isDirectory(_ url: URL) async -> Bool
 
-    /// Returns the immediate children (files and directories) of `url`.
+    /// 指定 URL の直下の子要素（ファイルとディレクトリ）を返す。
     ///
-    /// - Throws: ``PersistenceError/notFound(key:)`` if `url` is not an existing
-    ///   directory, or ``PersistenceError/storageFailed(operation:reason:)`` on
-    ///   an underlying read error.
+    /// - Throws: `url` が存在するディレクトリでない場合は ``PersistenceError/notFound(key:)``。
+    ///   基底の読み取りエラーは ``PersistenceError/storageFailed(operation:reason:)``。
     func contentsOfDirectory(_ url: URL) async throws -> [URL]
 
-    /// Reads the raw bytes of the file at `url`.
+    /// 指定 URL のファイルの生バイトを読み込む。
     ///
-    /// - Throws: ``PersistenceError/notFound(key:)`` if no file exists, or
-    ///   ``PersistenceError/storageFailed(operation:reason:)`` on a read error.
+    /// - Throws: ファイルが存在しない場合は ``PersistenceError/notFound(key:)``、
+    ///   読み取りエラーは ``PersistenceError/storageFailed(operation:reason:)``。
     func readData(_ url: URL) async throws -> Data
 }
 
 extension FileSystemReading {
 
-    /// Reads the file at `url` as a UTF-8 string.
+    /// 指定 URL のファイルを UTF-8 文字列として読み込む。
     public func readString(_ url: URL) async throws -> String {
         let data = try await readData(url)
         guard let string = String(data: data, encoding: .utf8) else {

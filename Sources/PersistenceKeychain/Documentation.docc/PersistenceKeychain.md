@@ -1,54 +1,54 @@
 # ``PersistenceKeychain``
 
-Keychain-backed ``SecureStore`` implementation for encrypted credential and secret storage.
+暗号化されたクレデンシャル・シークレット保存のための ``SecureStore`` 実装。
 
 ## Overview
 
-`PersistenceKeychain` provides `KeychainSecureStore`, the concrete ``SecureStore`` for values that must be encrypted at rest and survive app reinstall — API keys, OAuth tokens, session credentials, and other secrets that must not be stored in `UserDefaults` or on disk in plaintext.
+`PersistenceKeychain` は、静止状態で暗号化され・アプリ再インストール後も残す必要がある値 — API キー・OAuth トークン・セッションクレデンシャル・`UserDefaults` やディスクの平文に保存してはいけないシークレット — のための具体的な ``SecureStore`` である `KeychainSecureStore` を提供する。
 
-Under the hood, `KeychainSecureStore` stores each entry as a `kSecClassGenericPassword` Keychain item, with the logical key mapped to the `kSecAttrAccount` attribute and a configurable service identifier mapped to `kSecAttrService`. All writes are upserts (update if exists, add if not), so repeated calls to `setString` or `setData` for the same key are safe.
+内部では、各エントリを `kSecClassGenericPassword` Keychain アイテムとして保存し、論理キーを `kSecAttrAccount` 属性に、設定可能なサービス識別子を `kSecAttrService` にマッピングする。全書き込みはアップサート（存在する場合は更新、存在しない場合は追加）なので、同じキーへの `setString` や `setData` の繰り返し呼び出しは安全。
 
-`KeychainSecureStore` is an `actor`, so Keychain IPC is automatically moved off the caller's actor, making it safe to call from `@MainActor` view models.
+`KeychainSecureStore` はアクターなので Keychain IPC が呼び出し元アクターから自動的に切り離され、`@MainActor` のビューモデルから安全に呼び出せる。
 
-The `KeychainAccessibility` policy controls when the Keychain item can be read and whether it syncs to iCloud Keychain. The recommended default — ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — grants access only while the device is unlocked and suppresses iCloud sync, satisfying Apple Review §2.1 data-protection requirements:
+`KeychainAccessibility` ポリシーは Keychain アイテムをいつ読み込めるか・iCloud Keychain に同期するかを制御する。推奨デフォルト — ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — はデバイスのロック解除中のみアクセスを許可し iCloud 同期を抑制することで Apple Review §2.1 データ保護要件を満たす:
 
 ```swift
 import PersistenceKeychain
 
-// Default: whenUnlockedThisDeviceOnly — encrypted, device-only, no iCloud sync
+// デフォルト: whenUnlockedThisDeviceOnly — 暗号化・デバイス固有・iCloud 同期なし
 let secrets = KeychainSecureStore(
     service: Bundle.main.bundleIdentifier ?? "com.example.app"
 )
 
-// Store an API key
+// API キーを保存
 try await secrets.setString("sk-live-abc123", forKey: "openai_api_key")
 
-// Retrieve it
+// 取得
 if let apiKey = try await secrets.getString(forKey: "openai_api_key") {
-    // use apiKey
+    // apiKey を使用
 }
 
-// Remove it (e.g., on sign-out)
+// 削除（例: サインアウト時）
 try await secrets.remove(forKey: "openai_api_key")
 ```
 
-For credentials that must be available to background tasks (after first device unlock following reboot), use `afterFirstUnlockThisDeviceOnly`. For credentials that must roam across a user's devices via iCloud Keychain, use `whenUnlocked`:
+バックグラウンドタスクで必要なクレデンシャル（再起動後の初回ロック解除以降アクセス可能）には `afterFirstUnlockThisDeviceOnly` を使用する。ユーザーのデバイス間で iCloud Keychain 経由でローミングが必要なクレデンシャルには `whenUnlocked` を使用する:
 
 ```swift
-// Background-accessible, device-only
+// バックグラウンドアクセス可能・デバイス固有
 let backgroundSecrets = KeychainSecureStore(
     service: "com.example.app",
     accessibility: .afterFirstUnlockThisDeviceOnly
 )
 
-// Roams to iCloud Keychain across devices
+// iCloud Keychain 経由でデバイス間ローミング
 let cloudSecrets = KeychainSecureStore(
     service: "com.example.app",
     accessibility: .whenUnlocked
 )
 ```
 
-For cross-app sharing via an App Group Keychain, pass an `accessGroup`:
+App Group Keychain によるアプリ間共有には `accessGroup` を渡す:
 
 ```swift
 let sharedSecrets = KeychainSecureStore(
@@ -57,14 +57,14 @@ let sharedSecrets = KeychainSecureStore(
 )
 ```
 
-In test targets, replace `KeychainSecureStore` with `InMemorySecureStore` from `PersistenceTesting`. Both conform to ``SecureStore``, so no entitlements or real Keychain access is required during testing.
+テストターゲットでは、`PersistenceTesting` の `InMemorySecureStore` で `KeychainSecureStore` を置き換える。両者とも ``SecureStore`` に準拠するため、テスト時はエンタイトルメントも実 Keychain アクセスも不要。
 
 ## Topics
 
-### Implementation
+### 実装
 
 - ``KeychainSecureStore``
 
-### Accessibility Policy
+### アクセシビリティポリシー
 
 - ``KeychainAccessibility``

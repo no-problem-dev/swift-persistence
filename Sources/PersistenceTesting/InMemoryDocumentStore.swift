@@ -1,10 +1,10 @@
 import Foundation
 import PersistenceCore
 
-/// In-memory ``DocumentStore`` for testing.
+/// テスト用のインメモリ ``DocumentStore``。
 ///
-/// Actor isolation replaces manual `NSLock` synchronization.
-/// Documents are stored in a dictionary keyed by ID.
+/// アクター分離によりロック同期を置き換える。
+/// ドキュメントは ID をキーとする辞書に格納する。
 public actor InMemoryDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore
     where T.ID: CustomStringConvertible & Hashable & Sendable
 {
@@ -39,7 +39,7 @@ public actor InMemoryDocumentStore<T: Codable & Identifiable & Sendable>: Docume
         documents[id] != nil
     }
 
-    /// Returns the number of stored documents (for test assertions).
+    /// 格納ドキュメント数（テストアサーション用）。
     public var count: Int {
         documents.count
     }

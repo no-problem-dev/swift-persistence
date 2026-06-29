@@ -1,65 +1,65 @@
 # ``PersistenceCore``
 
-Protocol-oriented persistence abstractions for Swift — type-safe, async-ready, and fully testable.
+プロトコル指向の永続化抽象 — 型安全・非同期対応・完全テスト可能。
 
 ## Overview
 
-`PersistenceCore` defines the protocol surface and shared error type for the `swift-persistence` family. It has no external dependencies beyond Foundation, making it safe to use in any layer of your architecture — domain, use-case, or infrastructure alike.
+`PersistenceCore` は `swift-persistence` ファミリーのプロトコル面と共有エラー型を定義する。Foundation 以外の外部依存がなく、ドメイン・ユースケース・インフラのどのアーキテクチャ層でも安全にインポートできる。
 
-The package organises storage into two layers. **Layer 0 — `PersistenceCore`** (this module) owns the protocols, ``PersistenceError``, and the ``ChainedKeyResolver`` utility. Import it in your domain and use-case layer: your business logic depends only on the protocol types — ``KeyValueStore``, ``SecureStore``, ``DocumentStore``, ``RegistryStore``, ``FileSystemReading``, and ``FileSystemWriting`` — never on a concrete backend.
+パッケージのストレージは 2 層に分かれる。**Layer 0 — `PersistenceCore`**（このモジュール）がプロトコル・``PersistenceError``・``ChainedKeyResolver`` ユーティリティを所有する。ドメイン層・ユースケース層にインポートし、ビジネスロジックはプロトコル型（``KeyValueStore``、``SecureStore``、``DocumentStore``、``RegistryStore``、``FileSystemReading``、``FileSystemWriting``）にのみ依存させ、具体的なバックエンドには依存させない。
 
-**Layer 1** provides the concrete implementations and test doubles as separate importable modules so you pull in only what you need.
+**Layer 1** は具体的な実装とテストダブルを独立したインポート可能なモジュールとして提供し、必要なものだけを取り込める。
 
-`PersistenceUserDefaults` delivers `UserDefaultsKeyValueStore`, a ``KeyValueStore`` backed by `UserDefaults`. Primitive types — `String`, `Bool`, `Int`, `Double`, `Data` — use native UserDefaults accessors for efficiency; any other `Codable` type is round-tripped through `JSONEncoder`/`JSONDecoder` automatically. Import `PersistenceUserDefaults` in your infrastructure layer for lightweight user preferences such as theme selection, feature flags, and on-boarding state.
+`PersistenceUserDefaults` は `UserDefaultsKeyValueStore`（``KeyValueStore`` の `UserDefaults` 実装）を提供する。プリミティブ型（`String`、`Bool`、`Int`、`Double`、`Data`）はネイティブアクセサで効率的に処理し、それ以外の `Codable` 型は `JSONEncoder`/`JSONDecoder` で自動変換する。テーマ選択・フィーチャーフラグ・オンボーディング状態などの軽量なユーザー設定にはインフラ層で `PersistenceUserDefaults` を使用する。
 
-`PersistenceKeychain` delivers `KeychainSecureStore`, a ``SecureStore`` backed by the system Keychain via `kSecClassGenericPassword`. Items are protected by a configurable `KeychainAccessibility` policy — the default (`whenUnlockedThisDeviceOnly`) prevents iCloud Keychain sync and satisfies Apple Review §2.1 data-protection requirements. Import `PersistenceKeychain` for API keys, session tokens, and any secret that must survive app reinstall and be encrypted at rest.
+`PersistenceKeychain` は `KeychainSecureStore`（``SecureStore`` の Keychain 実装）を提供する。各エントリは `kSecClassGenericPassword` Keychain アイテムとして保護され、設定可能な `KeychainAccessibility` ポリシーで管理する。デフォルト（`whenUnlockedThisDeviceOnly`）は iCloud Keychain 同期を抑制し Apple Review §2.1 データ保護要件を満たす。API キー・セッショントークン・アプリ再インストール後も残す必要があり平文で保存してはいけないシークレットには `PersistenceKeychain` を使用する。
 
-`PersistenceFileSystem` delivers three concrete types. `FileSystemDocumentStore` persists each `Identifiable & Codable` document as an individual `{id}.json` file using atomic writes to prevent corruption. `FileSystemRegistryStore` persists an entire `[String: Codable]` dictionary as a single JSON file, ideal for caches and metadata registries. `FoundationFileSystem` wraps `FileManager` and conforms to both ``FileSystemReading`` and ``FileSystemWriting``, covering raw tree traversal — existence checks, directory listing, file reads, atomic writes, moves, and deletions. Import `PersistenceFileSystem` in your infrastructure layer for document or file-tree persistence.
+`PersistenceFileSystem` は 3 つの具体型を提供する。`FileSystemDocumentStore` は各 `Identifiable & Codable` ドキュメントを個別の `{id}.json` ファイルとしてアトミック書き込みで永続化し破損を防ぐ。`FileSystemRegistryStore` は `[String: Codable]` 辞書全体を単一 JSON ファイルとして永続化し、キャッシュやメタデータレジストリに適している。`FoundationFileSystem` は `FileManager` をラップし ``FileSystemReading`` と ``FileSystemWriting`` の両方に準拠して、存在確認・ディレクトリ一覧・ファイル読み取り・アトミック書き込み・移動・削除という生のツリー走査操作をカバーする。ドキュメントやファイルツリーの永続化にはインフラ層で `PersistenceFileSystem` を使用する。
 
-`PersistenceTesting` provides in-memory doubles for every protocol in this module — `InMemoryKeyValueStore`, `InMemorySecureStore`, `InMemoryDocumentStore`, `InMemoryRegistryStore`, `InMemoryFileSystem`, and `InMemoryKeyResolver`. All doubles are actors for data-race safety and can be pre-populated with seed data for deterministic test setups. Import `PersistenceTesting` in test targets only; inject the doubles through the protocol types so your production code remains decoupled from any backend.
+`PersistenceTesting` はこのモジュールの全プロトコルに対応するインメモリダブルを提供する — `InMemoryKeyValueStore`、`InMemorySecureStore`、`InMemoryDocumentStore`、`InMemoryRegistryStore`、`InMemoryFileSystem`、`InMemoryKeyResolver`。全ダブルはアクター分離によりデータレース安全で、決定的なテストセットアップのためにシードデータを事前設定できる。テストターゲットのみに `PersistenceTesting` をインポートし、プロトコル型を通じてダブルを注入することでプロダクションコードはバックエンドから切り離される。
 
 ```
-PersistenceCore (protocols + error)
+PersistenceCore (プロトコル + エラー)
   ├── PersistenceUserDefaults   → UserDefaultsKeyValueStore
   ├── PersistenceKeychain       → KeychainSecureStore, KeychainAccessibility
   ├── PersistenceFileSystem     → FileSystemDocumentStore, FileSystemRegistryStore, FoundationFileSystem
-  └── PersistenceTesting        → InMemory* doubles for all protocols
+  └── PersistenceTesting        → 全プロトコルの InMemory* ダブル
 ```
 
-See <doc:GettingStarted> for installation and per-backend usage examples.
+インストールとバックエンド別の使用例は <doc:GettingStarted> を参照。
 
 ## Topics
 
-### Essentials
+### はじめに
 
 - <doc:GettingStarted>
 
-### Key-Value Storage
+### キーバリューストレージ
 
 - ``KeyValueStore``
 
-### Secure Storage
+### セキュアストレージ
 
 - ``SecureStore``
 
-### Document Storage
+### ドキュメントストレージ
 
 - ``DocumentStore``
 
-### Registry Storage
+### レジストリストレージ
 
 - ``RegistryStore``
 
-### File System
+### ファイルシステム
 
 - ``FileSystemReading``
 - ``FileSystemWriting``
 
-### Key Resolution
+### キー解決
 
 - ``KeyResolver``
 - ``ChainedKeyResolver``
 
-### Errors
+### エラー
 
 - ``PersistenceError``

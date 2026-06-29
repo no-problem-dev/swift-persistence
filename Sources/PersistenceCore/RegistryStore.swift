@@ -1,25 +1,25 @@
 import Foundation
 
-/// JSON-backed registry for keyed entries.
+/// キー付きエントリの JSON バックドレジストリ。
 ///
-/// Generalizes the pattern used by model cache and adapter cache registries
-/// where a single JSON file maps string keys to metadata entries.
+/// 文字列キーからメタデータエントリへのマッピングを
+/// 単一 JSON ファイルで管理するパターンを汎化する。
+/// モデルキャッシュやアダプタキャッシュのレジストリなどで活用する。
 ///
-/// The consuming code (typically an actor) holds the in-memory dictionary and
-/// calls `load()` on init and `save(_:)` after mutations.
+/// 消費側コード（通常はアクター）がメモリ内辞書を保持し、
+/// 初期化時に `load()` を、更新後に `save(_:)` を呼ぶ。
 ///
-/// All methods are `async` so that implementations can perform I/O
-/// off the caller's actor (e.g., `@MainActor`).
+/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
 ///
-/// Implementations: ``FileSystemRegistryStore``, ``InMemoryRegistryStore``.
+/// 実装: ``FileSystemRegistryStore``, ``InMemoryRegistryStore``。
 public protocol RegistryStore<Entry>: Sendable {
     associatedtype Entry: Codable & Sendable
 
-    /// Loads the entire registry from storage.
+    /// レジストリ全体をストレージから読み込む。
     ///
-    /// Returns an empty dictionary if the registry does not exist or cannot be decoded.
+    /// レジストリが存在しない・デコードできない場合は空辞書を返す。
     func load() async -> [String: Entry]
 
-    /// Saves the entire registry to storage, atomically.
+    /// レジストリ全体をストレージにアトミックに保存する。
     func save(_ registry: [String: Entry]) async throws
 }

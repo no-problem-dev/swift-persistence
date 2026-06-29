@@ -1,48 +1,48 @@
-# Getting Started with swift-persistence
+# swift-persistence をはじめる
 
-Add persistence to your Swift app with a few lines of code.
+数行のコードで Swift アプリに永続化を追加する。
 
-## Installation
+## Overview
 
-Add the package via Swift Package Manager in `Package.swift`:
+### インストール
+
+`Package.swift` に Swift Package Manager 経由でパッケージを追加する:
 
 ```swift
 dependencies: [
     .package(
         url: "https://github.com/no-problem-dev/swift-persistence.git",
-        from: "2.0.0"
+        from: "1.0.0"
     )
 ]
 ```
 
-Then add only the modules you need to your target's `dependencies`:
+ターゲットの `dependencies` には必要なモジュールだけを追加する:
 
-| Module | When to use |
+| モジュール | 用途 |
 |--------|-------------|
-| `PersistenceCore` | Always — protocols and `PersistenceError` |
-| `PersistenceUserDefaults` | Storing user preferences in UserDefaults |
-| `PersistenceKeychain` | Storing API keys, tokens, credentials |
-| `PersistenceFileSystem` | Storing documents or registries on disk |
-| `PersistenceTesting` | In-memory doubles for unit tests |
+| `PersistenceCore` | 常時 — プロトコルと `PersistenceError` |
+| `PersistenceUserDefaults` | UserDefaults へのユーザー設定保存 |
+| `PersistenceKeychain` | API キー・トークン・クレデンシャルの保存 |
+| `PersistenceFileSystem` | ドキュメントやレジストリのディスク保存 |
+| `PersistenceTesting` | ユニットテスト用インメモリダブル |
 
-## Basic Usage
+### UserDefaults バックエンド — `UserDefaultsKeyValueStore`
 
-### UserDefaults backend — `UserDefaultsKeyValueStore`
-
-Use `UserDefaultsKeyValueStore` for lightweight user settings. Primitive types (`String`, `Bool`, `Int`, `Double`, `Data`) use native UserDefaults accessors; all other `Codable` types are JSON-encoded automatically.
+軽量なユーザー設定には `UserDefaultsKeyValueStore` を使用する。プリミティブ型（`String`、`Bool`、`Int`、`Double`、`Data`）はネイティブアクセサを使用し、その他の `Codable` 型は自動的に JSON エンコードする。
 
 ```swift
 import PersistenceUserDefaults
 
 let store = UserDefaultsKeyValueStore()
 
-// Write
+// 書き込み
 try await store.setValue("dark", forKey: "theme")
 
-// Read with convenience accessor
+// コンビニエンスアクセサで読み込み
 let theme: String? = try await store.string(forKey: "theme")
 
-// Custom Codable type
+// カスタム Codable 型
 struct AppPreferences: Codable, Sendable {
     var fontSize: Int
     var colorScheme: String
@@ -51,34 +51,34 @@ try await store.setValue(AppPreferences(fontSize: 14, colorScheme: "dark"), forK
 let prefs: AppPreferences? = try await store.value(forKey: "prefs", type: AppPreferences.self)
 ```
 
-### Keychain backend — `KeychainSecureStore`
+### Keychain バックエンド — `KeychainSecureStore`
 
-Use `KeychainSecureStore` for sensitive values such as API keys and session tokens. Items are stored under `kSecClassGenericPassword` and are encrypted by the OS.
+API キーやセッショントークンなどの機密値には `KeychainSecureStore` を使用する。アイテムは `kSecClassGenericPassword` として OS により暗号化される。
 
 ```swift
 import PersistenceKeychain
 
-// Default: whenUnlockedThisDeviceOnly — no iCloud sync, device-only
+// デフォルト: whenUnlockedThisDeviceOnly — iCloud 同期なし・デバイス固有
 let secrets = KeychainSecureStore(service: Bundle.main.bundleIdentifier ?? "com.example.app")
 
-// Store an API key
+// API キーを保存
 try await secrets.setString("sk-live-abc123", forKey: "openai_api_key")
 
-// Retrieve it
+// 取得
 if let apiKey = try await secrets.getString(forKey: "openai_api_key") {
-    // use apiKey
+    // apiKey を使用
 }
 
-// For cross-device sharing, use .whenUnlocked
+// デバイス間共有が必要な場合は .whenUnlocked を使用
 let sharedSecrets = KeychainSecureStore(
     service: "com.example.app",
     accessibility: .whenUnlocked
 )
 ```
 
-### File system backend — `FileSystemDocumentStore` and `FoundationFileSystem`
+### ファイルシステムバックエンド — `FileSystemDocumentStore` と `FoundationFileSystem`
 
-`FileSystemDocumentStore` persists each `Identifiable & Codable` document as a separate `{id}.json` file. `FoundationFileSystem` provides raw file tree access for directory scanning and file authoring.
+`FileSystemDocumentStore` は各 `Identifiable & Codable` ドキュメントを独立した `{id}.json` ファイルとして永続化する。`FoundationFileSystem` はディレクトリ走査とファイル生成のための生ファイルツリーアクセスを提供する。
 
 ```swift
 import PersistenceFileSystem
@@ -89,44 +89,44 @@ struct Note: Codable, Identifiable, Sendable {
     var body: String
 }
 
-// One-time setup — directory is created if absent
+// 初期セットアップ — ディレクトリが存在しない場合は自動作成
 let store = try FileSystemDocumentStore<Note>(
     directory: URL.documentsDirectory.appendingPathComponent("notes")
 )
 
-// Create / update
-let note = Note(id: UUID(), title: "Meeting notes", body: "...")
+// 作成 / 更新
+let note = Note(id: UUID(), title: "ミーティングノート", body: "...")
 try await store.save(note)
 
-// Read
+// 読み込み
 let loaded = try await store.load(id: note.id)
 let all: [Note] = try await store.loadAll()
 
-// Delete
+// 削除
 try await store.delete(id: note.id)
 ```
 
-## Testing
+### テスト
 
-Swap every production backend for an in-memory double from `PersistenceTesting` — no disk or Keychain access required.
+`PersistenceTesting` のインメモリダブルで全プロダクションバックエンドを置き換える — ディスクや Keychain へのアクセスは不要。
 
 ```swift
 import PersistenceTesting
 
-// Inject via protocol types so the same code runs against both backends
+// プロトコル型で注入 — 同じコードがどちらのバックエンドでも動作する
 let store: any KeyValueStore = InMemoryKeyValueStore()
 let secrets: any SecureStore = InMemorySecureStore()
 let docs: any DocumentStore = InMemoryDocumentStore<Note>()
 let fs: any FileSystemReading & FileSystemWriting = InMemoryFileSystem()
 
-// Pre-populate for deterministic tests
+// 決定的なテストのためにシードデータを事前設定
 let seeded = InMemoryKeyValueStore(["theme": "dark"])
 let fixedResolver = InMemoryKeyResolver(["API_KEY": "test-key-abc"])
 ```
 
-## Error Handling
+### エラーハンドリング
 
-All operations throw `PersistenceError`. It conforms to `LocalizedError`, so `error.localizedDescription` returns a human-readable message that includes the key and underlying reason:
+全操作は `PersistenceError` をスローする。`LocalizedError` に準拠しているため、`error.localizedDescription` でキーと原因を含む人間が読めるメッセージを取得できる:
 
 ```swift
 do {

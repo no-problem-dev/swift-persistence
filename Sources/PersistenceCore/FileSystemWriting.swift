@@ -1,62 +1,52 @@
 import Foundation
 
-/// Write-side filesystem abstraction — the mirror of ``FileSystemReading``.
+/// 書き込み側ファイルシステム抽象 — ``FileSystemReading`` の対。
 ///
-/// Generalizes the directory creation, file writing, deletion, and renaming
-/// needed by consumers that author a tree of files (e.g. writing a user-created
-/// `SKILL.md` under a skill root), without binding them to `FileManager`. This
-/// keeps such authoring logic testable against an in-memory tree and swappable
-/// for sandboxed or remote backends.
+/// `FileManager` に依存せず、ディレクトリ作成・ファイル書き込み・
+/// 削除・移動を抽象化する。消費側コード（例: スキルルート下の `SKILL.md` 生成）を
+/// テスト容易にし、サンドボックスやリモートバックエンドへの差し替えを可能にする。
 ///
-/// Paired with ``FileSystemReading`` so a single backend (``FoundationFileSystem``
-/// on disk, ``InMemoryFileSystem`` in tests) can serve both read and write.
+/// ``FileSystemReading`` と組み合わせて、単一バックエンド
+/// （ディスクは ``FoundationFileSystem``、テストは ``InMemoryFileSystem``）が
+/// 読み書き両方に対応する。
 ///
-/// All methods are `async` so file-backed implementations can move I/O off the
-/// caller's actor.
+/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
 ///
-/// Implementations: ``FoundationFileSystem``, ``InMemoryFileSystem``.
+/// 実装: ``FoundationFileSystem``, ``InMemoryFileSystem``。
 public protocol FileSystemWriting: Sendable {
 
-    /// Creates the directory at `url`, including any missing intermediate
-    /// directories.
+    /// 指定 URL にディレクトリを作成する。中間ディレクトリも必要に応じて生成。
     ///
-    /// Idempotent: succeeds without error if the directory already exists.
+    /// 冪等: ディレクトリが既に存在する場合もエラーにならない。
     ///
-    /// - Throws: ``PersistenceError/directoryCreationFailed(path:reason:)`` if
-    ///   the directory could not be created.
+    /// - Throws: ディレクトリを作成できない場合は ``PersistenceError/directoryCreationFailed(path:reason:)``。
     func createDirectory(_ url: URL) async throws
 
-    /// Writes `data` to the file at `url`, atomically, overwriting any existing
-    /// file.
+    /// 指定 URL のファイルに `data` をアトミックに書き込む。既存ファイルは上書き。
     ///
-    /// Ensures the parent directory exists first (creating intermediates as
-    /// needed), so a single `write` is sufficient to materialize a file at a
-    /// fresh path.
+    /// 親ディレクトリが存在しない場合も自動的に作成するため、
+    /// 1 回の `write` だけで新規パスへのファイル生成が完結する。
     ///
-    /// - Throws: ``PersistenceError/storageFailed(operation:reason:)`` on a
-    ///   write error.
+    /// - Throws: 書き込みエラーは ``PersistenceError/storageFailed(operation:reason:)``。
     func write(_ data: Data, to url: URL) async throws
 
-    /// Removes the file or directory at `url`, recursively for directories.
+    /// 指定 URL のファイルまたはディレクトリを再帰的に削除する。
     ///
-    /// Idempotent: succeeds without error if nothing exists at `url`.
+    /// 冪等: 指定 URL に何も存在しない場合もエラーにならない。
     ///
-    /// - Throws: ``PersistenceError/storageFailed(operation:reason:)`` on a
-    ///   removal error.
+    /// - Throws: 削除エラーは ``PersistenceError/storageFailed(operation:reason:)``。
     func removeItem(_ url: URL) async throws
 
-    /// Moves the file or directory at `source` to `destination`, preserving the
-    /// subtree.
+    /// `source` のファイルまたはディレクトリをサブツリーごと `destination` に移動する。
     ///
-    /// - Throws: ``PersistenceError/notFound(key:)`` if `source` does not exist,
-    ///   or ``PersistenceError/storageFailed(operation:reason:)`` if
-    ///   `destination` already exists or the move fails.
+    /// - Throws: `source` が存在しない場合は ``PersistenceError/notFound(key:)``。
+    ///   `destination` が既に存在するか移動が失敗した場合は ``PersistenceError/storageFailed(operation:reason:)``。
     func moveItem(from source: URL, to destination: URL) async throws
 }
 
 extension FileSystemWriting {
 
-    /// Writes `string` as UTF-8 to the file at `url`.
+    /// 指定 URL のファイルに文字列を UTF-8 で書き込む。
     public func write(_ string: String, to url: URL) async throws {
         try await write(Data(string.utf8), to: url)
     }
