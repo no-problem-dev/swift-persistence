@@ -53,8 +53,9 @@ let registry = FileSystemRegistryStore<ModelRecord>(
     directory: URL.cachesDirectory.appendingPathComponent("models")
 )
 
-// The calling actor holds the dictionary and saves it after each update
-var entries = await registry.load()
+// The calling actor holds the dictionary and saves it after each update. A registry that is
+// there but will not decode throws here, which is what keeps the save below from replacing it.
+var entries = try await registry.load()
 entries["llama-3b"] = ModelRecord(downloadedAt: .now, sizeBytes: 1_800_000_000)
 try await registry.save(entries)
 ```

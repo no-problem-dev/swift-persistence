@@ -16,14 +16,27 @@ public protocol RegistryStore<Entry>: Sendable {
 
     /// Reads the whole registry.
     ///
-    /// This cannot fail. A registry that is missing, unreadable or corrupt all arrive as an empty
-    /// dictionary, indistinguishable from one that was never written. A caller that has to tell
-    /// "empty" from "broken" must look at the backing storage itself.
-    func load() async -> [String: Entry]
+    /// **Nothing stored yet and unreadable are two different answers.** A registry that was never
+    /// written comes back empty; one that is there but cannot be read or decoded throws.
+    ///
+    /// The distinction is the point. ``save(_:)`` replaces the file wholesale, so a read that
+    /// answered a broken registry with an empty dictionary would let the usual load-mutate-save
+    /// cycle write that emptiness back over data that was still recoverable by hand — the failure
+    /// destroying the evidence of itself. A schema change to `Entry` is exactly this case, and
+    /// throwing is what stops the cycle before the save.
+    ///
+    /// - Returns: Every entry stored, or an empty dictionary when nothing has been stored yet.
+    /// - Throws: ``PersistenceError/decodingFailed(key:reason:)`` when the stored registry does
+    ///   not decode into `Entry`, or ``PersistenceError/storageFailed(operation:reason:)`` when it
+    ///   cannot be read at all.
+    func load() async throws -> [String: Entry]
 
     /// Writes the whole registry, replacing what was there.
     ///
-    /// A replacement, not a merge: keys absent from the argument are gone afterwards.
+    /// A replacement, not a merge: keys absent from the argument are gone afterwards. It is also a
+    /// replacement of whatever could not be read — **saving after ``load()`` threw discards the
+    /// unreadable registry**, so recover or copy it first if it matters.
+    ///
     /// Implementations replace it atomically, so a reader sees either the previous contents or
     /// the new ones and never a partial write.
     ///

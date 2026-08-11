@@ -161,7 +161,7 @@ struct FileSystemRegistryStoreTests {
         defer { removeTempDir(dir) }
 
         let store = FileSystemRegistryStore<TestEntry>(directory: dir)
-        let registry = await store.load()
+        let registry = try await store.load()
         #expect(registry.isEmpty)
     }
 
@@ -176,7 +176,7 @@ struct FileSystemRegistryStoreTests {
             "model-b": TestEntry(name: "Model B", size: 2048),
         ]
         try await store.save(registry)
-        let loaded = await store.load()
+        let loaded = try await store.load()
         #expect(loaded == registry)
     }
 
@@ -217,7 +217,7 @@ struct FileSystemRegistryStoreTests {
         try await store1.save(["key": TestEntry(name: "persistent", size: 42)])
 
         let store2 = FileSystemRegistryStore<TestEntry>(directory: dir)
-        let loaded = await store2.load()
+        let loaded = try await store2.load()
         #expect(loaded["key"]?.name == "persistent")
     }
 
@@ -229,8 +229,114 @@ struct FileSystemRegistryStoreTests {
         let store = FileSystemRegistryStore<TestEntry>(directory: dir)
         try await store.save(["a": TestEntry(name: "a", size: 1)])
         try await store.save(["b": TestEntry(name: "b", size: 2)])
-        let loaded = await store.load()
+        let loaded = try await store.load()
         #expect(loaded.keys.contains("b"))
         #expect(!loaded.keys.contains("a"))
+    }
+
+    // MARK: - Nothing stored yet vs. cannot be read
+
+    /// The schema change, which is the ordinary way to reach this. The bytes are still perfectly
+    /// good JSON and still hold everything the entries were made of; they just no longer fit
+    /// `Entry`. Answering that with "the registry is empty" is a lie the caller cannot detect.
+    @Test("Entry の形が変わったファイルは decodingFailed で落ちる（空とは言わない）")
+    func mismatchedSchemaThrows() async throws {
+        let dir = try makeTempDir()
+        defer { removeTempDir(dir) }
+
+        let registryURL = dir.appendingPathComponent("registry.json")
+        try Data(#"{"model-a":{"name":"Model A","sizeInBytes":1024}}"#.utf8)
+            .write(to: registryURL)
+
+        let store = FileSystemRegistryStore<TestEntry>(directory: dir)
+        await #expect(throws: PersistenceError.self) {
+            try await store.load()
+        }
+    }
+
+    @Test("壊れた JSON は decodingFailed で落ちる")
+    func truncatedJSONThrows() async throws {
+        let dir = try makeTempDir()
+        defer { removeTempDir(dir) }
+
+        let registryURL = dir.appendingPathComponent("registry.json")
+        try Data(#"{"model-a":{"name":"Model A","#.utf8).write(to: registryURL)
+
+        let store = FileSystemRegistryStore<TestEntry>(directory: dir)
+        let error = await #expect(throws: PersistenceError.self) {
+            try await store.load()
+        }
+        guard case .decodingFailed(let key, _) = error else {
+            Issue.record("expected decodingFailed, got \(String(describing: error))")
+            return
+        }
+        #expect(key == "registry")
+    }
+
+    /// Something is at the path but no bytes can come out of it — a different failure from bytes
+    /// that come out and do not fit, and it has its own case.
+    @Test("そもそも読めないパスは storageFailed で落ちる")
+    func unreadablePathThrows() async throws {
+        let dir = try makeTempDir()
+        defer { removeTempDir(dir) }
+
+        // A directory where the file should be: it exists, and reading it as a file cannot work.
+        try FileManager.default.createDirectory(
+            at: dir.appendingPathComponent("registry.json"),
+            withIntermediateDirectories: true
+        )
+
+        let store = FileSystemRegistryStore<TestEntry>(directory: dir)
+        let error = await #expect(throws: PersistenceError.self) {
+            try await store.load()
+        }
+        guard case .storageFailed(let operation, _) = error else {
+            Issue.record("expected storageFailed, got \(String(describing: error))")
+            return
+        }
+        #expect(operation == "load")
+    }
+
+    /// The reason the load throws at all: the usual cycle is read, change, write back, and a read
+    /// that answered "empty" would make the write destroy a file that could still have been
+    /// recovered by hand. The throw has to stop the cycle before the save.
+    @Test("読めなかった registry は、その後の save で上書きされない")
+    func failedLoadNeverLeadsToOverwrite() async throws {
+        let dir = try makeTempDir()
+        defer { removeTempDir(dir) }
+
+        let registryURL = dir.appendingPathComponent("registry.json")
+        let original = Data(#"{"model-a":{"name":"Model A","sizeInBytes":1024}}"#.utf8)
+        try original.write(to: registryURL)
+
+        let store = FileSystemRegistryStore<TestEntry>(directory: dir)
+
+        // Read, change, write back — exactly as a consumer holds a registry.
+        var reachedSave = false
+        do {
+            var entries = try await store.load()
+            entries["model-b"] = TestEntry(name: "Model B", size: 2048)
+            reachedSave = true
+            try await store.save(entries)
+        } catch {
+            // Expected: the load refuses, so the save is never reached.
+        }
+
+        #expect(!reachedSave)
+        #expect(try Data(contentsOf: registryURL) == original)
+    }
+
+    @Test("一度も書かれていない registry だけが空として読める")
+    func onlyAnUnwrittenRegistryReadsAsEmpty() async throws {
+        let dir = try makeTempDir()
+        defer { removeTempDir(dir) }
+
+        let store = FileSystemRegistryStore<TestEntry>(directory: dir)
+        #expect(try await store.load().isEmpty)
+
+        // And an empty registry that really was written still reads as empty, so "empty" keeps
+        // its own meaning rather than becoming a synonym for "no file".
+        try await store.save([:])
+        #expect(try await store.load().isEmpty)
     }
 }

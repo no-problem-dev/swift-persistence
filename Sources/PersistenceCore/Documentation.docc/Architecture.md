@@ -80,11 +80,11 @@ This is where the backends differ most, and where a silent one costs the most.
 | `KeychainSecureStore` | reading a stored value that is not valid UTF-8 as a string fails; the item is left in place |
 | `FileSystemDocumentStore` — `load(id:)` | **throws** ``PersistenceError/decodingFailed(key:reason:)``; the file is left in place |
 | `FileSystemDocumentStore` — `loadAll()` | **skips the file silently.** A document left over from an older schema simply disappears from the result, and a short result cannot be told from a small store |
-| `FileSystemRegistryStore` — `load()` | **returns an empty dictionary.** A missing file, truncated JSON, and an entry that no longer matches `Entry` are indistinguishable, and the next `save(_:)` overwrites the file that could have been recovered by hand. Take a copy before changing `Entry` |
+| `FileSystemRegistryStore` — `load()` | **throws** ``PersistenceError/decodingFailed(key:reason:)``; the file is left in place. Only a registry that was never written reads as empty, so the load-mutate-save cycle stops at the load instead of writing emptiness over a recoverable file |
 | `InMemoryKeyValueStore` | **throws.** Every value round-trips through JSON, so reading a key as the wrong type fails here even where the defaults-backed store would answer `nil` or coerce |
 
-The two silent ones — `loadAll()` and the registry's `load()` — are the cases worth designing
-around. Neither logs.
+`loadAll()` is the silent one left, and it does not log. It is the case worth designing around:
+a result short by one document looks exactly like a store that only ever held the rest.
 
 ## Keys on disk
 

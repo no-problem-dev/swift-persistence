@@ -6,8 +6,8 @@ import PersistenceCore
 /// Nothing is encoded and nothing is written, so entries come back as the exact values that went
 /// in and a type that would fail to encode still round-trips. Nothing survives the process.
 ///
-/// The file-backed store answers an unreadable registry with an empty dictionary; this one has no
-/// such failure to answer with, so a test for that path needs the real store.
+/// ``load()`` here never throws, because there is no stored form to be unreadable. The file-backed
+/// store does throw on one, so a test that exercises that path needs the real store.
 ///
 /// Being an actor, it is safe to share between tasks.
 public actor InMemoryRegistryStore<Entry: Codable & Sendable>: RegistryStore {

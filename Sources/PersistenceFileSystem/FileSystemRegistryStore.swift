@@ -6,11 +6,11 @@ import PersistenceCore
 /// A save replaces the file with exactly the dictionary it is given, so entries the caller
 /// dropped are gone from disk. Nothing is cached, so every read parses the file again.
 ///
-/// A registry that cannot be read comes back empty. A missing file, truncated JSON and an entry
-/// that no longer matches `Entry` are all reported the same way, without an error and without a
-/// log line, so a schema change silently empties the registry and the next save overwrites the
-/// file that could have been recovered by hand. Keep a copy before changing `Entry` if the
-/// contents matter.
+/// A missing file reads as an empty registry; a file that is there but will not read or decode
+/// throws. Truncated JSON and an entry that no longer matches `Entry` are therefore both loud,
+/// which is what keeps the load-mutate-save cycle from writing an empty registry over a file that
+/// was still recoverable by hand. A schema change to `Entry` is the ordinary way to reach this,
+/// and it stops at the load.
 ///
 /// The file is written atomically, so a reader sees either the previous registry or the new one.
 /// It is not flushed, so a power loss just after a save can still lose it. Keys are sorted in the
@@ -43,15 +43,26 @@ public actor FileSystemRegistryStore<Entry: Codable & Sendable>: RegistryStore {
 
     // MARK: - RegistryStore
 
-    public func load() -> [String: Entry] {
+    public func load() throws -> [String: Entry] {
         guard FileManager.default.fileExists(atPath: registryURL.path) else {
             return [:]
         }
+        let data: Data
         do {
-            let data = try Data(contentsOf: registryURL)
+            data = try Data(contentsOf: registryURL)
+        } catch {
+            throw PersistenceError.storageFailed(
+                operation: "load",
+                reason: error.localizedDescription
+            )
+        }
+        do {
             return try JSONDecoder().decode([String: Entry].self, from: data)
         } catch {
-            return [:]
+            throw PersistenceError.decodingFailed(
+                key: "registry",
+                reason: error.localizedDescription
+            )
         }
     }
 
