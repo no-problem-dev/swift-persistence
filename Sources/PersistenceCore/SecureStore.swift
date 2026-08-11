@@ -1,35 +1,41 @@
 import Foundation
 
-/// セキュアなクレデンシャルストレージ（Keychain）の抽象。
+/// Storage for credentials, kept out of the app's own files and encrypted at rest.
 ///
-/// API キーなどの機密値を暗号化ストレージに保存する。
-/// ``KeyValueStore`` と異なり、シークレット・トークンで多用する
-/// 文字列とバイナリ値に特化する。
+/// Use it for anything that would be damaging to read out of a backup: API keys, auth tokens,
+/// passwords. Ordinary settings belong in ``KeyValueStore``, which has no protection at all.
 ///
-/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
+/// Only strings and raw bytes are offered, which is the shape credentials arrive in. There is no
+/// `Codable` overload.
 ///
-/// 実装: ``KeychainSecureStore``, ``InMemorySecureStore``。
+/// Implementations: ``KeychainSecureStore``, ``InMemorySecureStore``.
 public protocol SecureStore: Sendable {
 
-    /// セキュアストレージから文字列値を読み込む。
+    /// Reads a string from secure storage.
     ///
-    /// - Returns: 格納された文字列。キーが存在しない場合は `nil`。
+    /// - Returns: `nil` when the key holds nothing.
+    /// - Throws: ``PersistenceError/decodingFailed(key:reason:)`` when the stored bytes are not
+    ///   valid UTF-8. The bytes stay where they are, and ``getData(forKey:)`` can still recover
+    ///   them.
     func getString(forKey key: String) async throws -> String?
 
-    /// セキュアストレージに文字列値を書き込む。同キーの既存値は上書き。
+    /// Writes a string as its UTF-8 bytes, replacing whatever the key held.
     func setString(_ value: String, forKey key: String) async throws
 
-    /// セキュアストレージから生バイトを読み込む。
+    /// Reads raw bytes from secure storage.
     ///
-    /// - Returns: 格納されたデータ。キーが存在しない場合は `nil`。
+    /// - Returns: `nil` when the key holds nothing.
     func getData(forKey key: String) async throws -> Data?
 
-    /// セキュアストレージに生バイトを書き込む。同キーの既存値は上書き。
+    /// Writes raw bytes, replacing whatever the key held.
     func setData(_ value: Data, forKey key: String) async throws
 
-    /// 指定キーの値を削除する。キーが存在しない場合もエラーにならない。
+    /// Removes what a key holds. Removing a key that holds nothing is not an error.
     func remove(forKey key: String) async throws
 
-    /// 指定キーに値が存在する場合に `true` を返す。
+    /// Reports whether a key holds a value.
+    ///
+    /// The Keychain-backed implementation answers by reading the item, so this costs what
+    /// ``getData(forKey:)`` costs and fails in the same situations.
     func contains(key: String) async throws -> Bool
 }

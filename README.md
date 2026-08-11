@@ -2,21 +2,58 @@ English | [日本語](./README.ja.md)
 
 # SwiftPersistence
 
-A protocol-oriented persistence abstraction layer for Swift
+A protocol-oriented persistence abstraction layer for Swift.
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+Your domain and use-case layers depend on a protocol; the composition root picks whether that
+protocol is backed by `UserDefaults`, the Keychain, the file system, or nothing at all.
+
 ## Features
 
-- **Protocol-Oriented** - All persistence operations defined as abstract protocols for DI and testability
-- **KeyValueStore** - Type-safe UserDefaults abstraction (Codable support)
-- **SecureStore** - Safe Keychain wrapper (API key and credential protection)
-- **DocumentStore** - File-based CRUD (individual JSON files, atomic writes)
-- **RegistryStore** - Single JSON file registry pattern
-- **KeyResolver** - Multi-source fallback resolution: Info.plist → Keychain → UserDefaults
-- **InMemory Test Doubles** - Bundled InMemory implementations for all protocols
+- **Protocol-oriented** — every storage operation is an abstract protocol, so a use case can be
+  tested without touching disk, the Keychain, or an entitlement
+- **KeyValueStore** — a type-safe `UserDefaults` abstraction; primitives go through native accessors
+  and any other `Codable` type is JSON-encoded automatically
+- **SecureStore** — a Keychain wrapper for API keys and credentials, with an explicit accessibility
+  policy that defaults to this-device-only
+- **DocumentStore** — file-backed CRUD, one JSON file per document, written atomically
+- **RegistryStore** — a whole `[String: Codable]` dictionary in a single JSON file, for caches and
+  metadata indexes
+- **KeyResolver** — multi-source fallback in a fixed order: `Info.plist`, then Keychain, then
+  `UserDefaults`
+- **In-memory doubles for every protocol** — seedable, actor-isolated, and shipped in their own
+  module so they never reach a production target
+
+## Quick Start
+
+```swift
+import PersistenceUserDefaults
+
+let store = UserDefaultsKeyValueStore()
+
+try await store.setValue("dark", forKey: "theme")
+let theme: String? = try await store.string(forKey: "theme")
+```
+
+Depend on the protocol, not the backend, and the same code runs against the real store in the app
+and against an in-memory double in tests:
+
+```swift
+import PersistenceCore
+import PersistenceTesting
+
+let store: any KeyValueStore = InMemoryKeyValueStore(["theme": "dark"])
+```
+
+## Documentation
+
+[**API reference and guides**](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/) —
+including [Getting Started](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/gettingstarted/)
+and [Architecture](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/architecture/),
+which explains what each backend guarantees about durability, threading, and decode failure.
 
 ## Installation
 
@@ -27,140 +64,14 @@ dependencies: [
 ]
 ```
 
-### Module Structure
-
-Import only the modules you need:
-
-| Module | Purpose |
-|--------|---------|
-| `PersistenceCore` | Protocols + error types (Foundation only, no external dependencies) |
-| `PersistenceUserDefaults` | UserDefaults-backed KeyValueStore implementation |
-| `PersistenceKeychain` | Keychain-backed SecureStore implementation |
-| `PersistenceFileSystem` | File-backed DocumentStore / RegistryStore implementations |
-| `PersistenceTesting` | 5 InMemory implementations (test DI doubles) |
-
-## Quick Start
-
-### Key-Value Store (UserDefaults Abstraction)
+Add only the modules a target actually needs:
 
 ```swift
-import PersistenceUserDefaults
-
-let store = UserDefaultsKeyValueStore()
-
-// Save and retrieve Codable values
-try await store.setValue("dark", forKey: "theme")
-let theme: String? = try await store.string(forKey: "theme")
-
-// Custom types supported
-struct UserPrefs: Codable, Sendable {
-    var fontSize: Int
-    var language: String
-}
-try await store.setValue(UserPrefs(fontSize: 14, language: "en"), forKey: "prefs")
-let prefs: UserPrefs? = try await store.value(forKey: "prefs", type: UserPrefs.self)
-```
-
-### Secure Store (Keychain Abstraction)
-
-```swift
-import PersistenceKeychain
-
-let secrets = KeychainSecureStore(service: "com.example.myapp")
-
-// Securely store API keys
-try await secrets.setString("sk-abc123...", forKey: "api_key")
-let key = try await secrets.getString(forKey: "api_key")
-```
-
-### Document Store (File-based CRUD)
-
-```swift
-import PersistenceFileSystem
-
-struct Note: Codable, Identifiable, Sendable {
-    let id: UUID
-    var title: String
-    var body: String
-}
-
-let store = try FileSystemDocumentStore<Note>(
-    directory: documentsURL.appendingPathComponent("notes")
-)
-
-// CRUD operations
-let note = Note(id: UUID(), title: "Memo", body: "Content")
-try await store.save(note)
-let all = try await store.loadAll()
-try await store.delete(id: note.id)
-```
-
-### Registry Store (Single JSON Registry)
-
-```swift
-import PersistenceFileSystem
-
-struct CacheEntry: Codable, Sendable {
-    let version: String
-    let downloadedAt: Date
-}
-
-let registry = FileSystemRegistryStore<CacheEntry>(
-    directory: cacheURL,
-    filename: "registry.json"
-)
-
-var entries = await registry.load()
-entries["model-v1"] = CacheEntry(version: "1.0", downloadedAt: Date())
-try await registry.save(entries)
-```
-
-### Multi-Source Fallback Resolution
-
-```swift
-import PersistenceCore
-import PersistenceKeychain
-import PersistenceUserDefaults
-
-let resolver = ChainedKeyResolver(
-    secureStore: KeychainSecureStore(service: "com.example.myapp"),
-    keyValueStore: UserDefaultsKeyValueStore(),
-    keyMapping: [
-        "API_KEY": .init(secure: "api_key", keyValue: "api_key"),
-    ]
-)
-
-// Searches in order: Info.plist → Keychain → UserDefaults
-let apiKey = await resolver.resolve("API_KEY")
-```
-
-### InMemory Test Doubles
-
-```swift
-import PersistenceTesting
-
-// Inject via DI in tests
-let mockStore = InMemoryKeyValueStore()
-let mockSecrets = InMemorySecureStore()
-let mockDocs = InMemoryDocumentStore<Note>()
-
-let settings = AppSettings(
-    preferences: mockStore,
-    secrets: mockSecrets,
-    keyResolver: InMemoryKeyResolver(["API_KEY": "test-key"])
-)
-```
-
-## Architecture
-
-2-layer architecture for separation of concerns:
-
-```
-Layer 0: PersistenceCore           Protocols + error types (no external dependencies)
-Layer 1: PersistenceUserDefaults   UserDefaults concrete implementation
-         PersistenceKeychain       Keychain concrete implementation
-         PersistenceFileSystem     File system concrete implementation
-         PersistenceTesting        InMemory test doubles
+.product(name: "PersistenceCore",         package: "swift-persistence"),
+.product(name: "PersistenceUserDefaults", package: "swift-persistence"),
+.product(name: "PersistenceKeychain",     package: "swift-persistence"),
+.product(name: "PersistenceFileSystem",   package: "swift-persistence"),
+.product(name: "PersistenceTesting",      package: "swift-persistence"),  // test targets only
 ```
 
 ## Requirements
@@ -171,9 +82,4 @@ Layer 1: PersistenceUserDefaults   UserDefaults concrete implementation
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details
-
-## Links
-
-- [Report Issues](https://github.com/no-problem-dev/swift-persistence/issues)
-- [Discussions](https://github.com/no-problem-dev/swift-persistence/discussions)
+MIT — see [LICENSE](LICENSE).

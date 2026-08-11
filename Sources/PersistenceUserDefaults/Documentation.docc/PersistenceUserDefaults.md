@@ -1,27 +1,27 @@
 # ``PersistenceUserDefaults``
 
-軽量なユーザー設定保存のための `UserDefaults` バックド ``KeyValueStore`` 実装。
+Lightweight storage for user settings and feature flags, backed by the system defaults database.
 
 ## Overview
 
-`PersistenceUserDefaults` は、アプリ起動をまたいで永続化するが暗号化が不要な設定 — テーマ選択・フィーチャーフラグ・チュートリアル進捗・同様の軽量な状態 — を `UserDefaults` に保存する具体的な ``KeyValueStore`` である `UserDefaultsKeyValueStore` を提供する。
+`PersistenceUserDefaults` provides `UserDefaultsKeyValueStore`, a concrete ``KeyValueStore`` that keeps settings in `UserDefaults`: values that must survive app launches but do not need encryption — theme selection, feature flags, tutorial progress, and similar lightweight state.
 
-`UserDefaultsKeyValueStore` はアクターなので読み書きが呼び出し元アクターから自動的にホップし、メインスレッドをブロックせず `@MainActor` のビューモデルから安全に呼び出せる。
+`UserDefaultsKeyValueStore` is an actor, so reads and writes hop off the calling actor automatically. It is safe to call from a `@MainActor` view model without blocking the main thread.
 
-プリミティブ型（`String`、`Bool`、`Int`、`Double`、`Data`）は `UserDefaults` のネイティブアクセサを効率的に使用する。それ以外の `Codable` 型は `JSONEncoder`/`JSONDecoder` で透過的に変換する:
+Primitive types (`String`, `Bool`, `Int`, `Double`, `Data`) use the native `UserDefaults` accessors. Every other `Codable` type is converted transparently with `JSONEncoder` and `JSONDecoder`:
 
 ```swift
 import PersistenceUserDefaults
 
 let store = UserDefaultsKeyValueStore()
 
-// プリミティブ値を書き込む
+// Write a primitive value
 try await store.setValue(true, forKey: "notifications_enabled")
 
-// 型付きコンビニエンスアクセサで読み込む
+// Read through a typed convenience accessor
 let enabled: Bool? = try await store.bool(forKey: "notifications_enabled")
 
-// カスタム Codable 型 — 自動的に JSON エンコード
+// Custom Codable types are JSON-encoded automatically
 struct AppPreferences: Codable, Sendable {
     var fontSize: Int
     var colorScheme: String
@@ -34,16 +34,16 @@ try await store.setValue(
 let prefs: AppPreferences? = try await store.value(forKey: "prefs", type: AppPreferences.self)
 ```
 
-共有コンテナ（App Groups）には初期化時に `suiteName` を渡す:
+Pass a `suiteName` at initialisation to use a shared container such as an App Group:
 
 ```swift
 let sharedStore = UserDefaultsKeyValueStore(suiteName: "group.com.example.app")
 ```
 
-テストターゲットでは、`PersistenceTesting` の `InMemoryKeyValueStore` で `UserDefaultsKeyValueStore` を置き換える。両者とも ``KeyValueStore`` に準拠するため、プロダクションコードの変更は不要。
+In test targets, replace `UserDefaultsKeyValueStore` with `InMemoryKeyValueStore` from `PersistenceTesting`. Both conform to ``KeyValueStore``, so production code does not change.
 
 ## Topics
 
-### 実装
+### Implementation
 
 - ``UserDefaultsKeyValueStore``

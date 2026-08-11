@@ -1,24 +1,38 @@
 import Foundation
 
-/// 全永続化操作の統一エラー型。
+/// The one error every store in this package throws.
+///
+/// Each case names what failed and carries the underlying reason as text. The original error is
+/// not retained, so a caller can report the failure but cannot inspect or re-throw the platform
+/// error behind it.
 public enum PersistenceError: Error, Sendable, Equatable {
 
-    /// 要求されたアイテムが見つからない。
+    /// Nothing is stored under this key.
+    ///
+    /// Only reads that return a non-optional value throw this. Reads that return an optional
+    /// signal the same condition with `nil`.
     case notFound(key: String)
 
-    /// ストレージ用のエンコードに失敗した。
+    /// The value could not be turned into bytes, so nothing was written.
     case encodingFailed(key: String, reason: String)
 
-    /// 格納データのデコードに失敗した。
+    /// Bytes were found but did not decode into the requested type.
+    ///
+    /// The stored bytes are left untouched, so the same read keeps failing until the key is
+    /// overwritten or removed. This is what a schema change looks like from the read side.
     case decodingFailed(key: String, reason: String)
 
-    /// 基礎ストレージ操作が失敗した（ディスク・Keychain など）。
+    /// The backing store refused the operation, or failed part-way through it.
     case storageFailed(operation: String, reason: String)
 
-    /// ストレージへのアクセスが拒否された（例: Keychain エンタイトルメント不足）。
+    /// The Keychain answered with a status other than success or "item not found".
+    ///
+    /// The reason carries the raw `OSStatus`, and not every value means a permission problem: a
+    /// read attempted while the device is locked and a query the Keychain rejected both arrive
+    /// here alongside a missing entitlement.
     case accessDenied(reason: String)
 
-    /// ストレージディレクトリを作成できなかった。
+    /// A directory a store needs could not be created, leaving the store unusable.
     case directoryCreationFailed(path: String, reason: String)
 }
 

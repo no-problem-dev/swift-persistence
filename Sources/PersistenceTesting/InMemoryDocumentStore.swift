@@ -1,10 +1,17 @@
 import Foundation
 import PersistenceCore
 
-/// テスト用のインメモリ ``DocumentStore``。
+/// Holds documents in a dictionary for the life of the process, for use in tests.
 ///
-/// アクター分離によりロック同期を置き換える。
-/// ドキュメントは ID をキーとする辞書に格納する。
+/// Nothing is written anywhere and nothing survives the process: every instance starts empty.
+/// Documents are kept as values rather than encoded, so a type that would fail to encode or
+/// decode still round-trips here. A test that passes against this store is therefore no proof
+/// that the disk-backed one will work.
+///
+/// The missing-document cases do match the disk-backed store, so tests for those paths are worth
+/// writing here.
+///
+/// Being an actor, it is safe to share between tasks.
 public actor InMemoryDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore
     where T.ID: CustomStringConvertible & Hashable & Sendable
 {
@@ -25,6 +32,10 @@ public actor InMemoryDocumentStore<T: Codable & Identifiable & Sendable>: Docume
         return document
     }
 
+    /// Reads every document, in an order that varies between runs.
+    ///
+    /// The order is the dictionary's, so a test that compares the result against a literal array
+    /// has to sort it first.
     public func loadAll() throws -> [T] {
         Array(documents.values)
     }
@@ -39,7 +50,7 @@ public actor InMemoryDocumentStore<T: Codable & Identifiable & Sendable>: Docume
         documents[id] != nil
     }
 
-    /// 格納ドキュメント数（テストアサーション用）。
+    /// How many documents are held, so a test can assert on the size without listing them.
     public var count: Int {
         documents.count
     }

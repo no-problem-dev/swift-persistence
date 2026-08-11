@@ -1,10 +1,16 @@
 import Foundation
 import PersistenceCore
 
-/// テスト用のインメモリ ``SecureStore``。
+/// Keeps secrets in a dictionary, for use in tests.
 ///
-/// アクター分離によりロック同期を置き換え、
-/// エンタイトルメントや実 Keychain なしで Keychain の挙動をシミュレートする。
+/// Nothing is encrypted, nothing is written and nothing survives the process. It stands in for
+/// the Keychain so tests can run without entitlements, a signed bundle or a device.
+///
+/// Only the success paths are modelled: reads never fail, so nothing here exercises the
+/// locked-device or missing-entitlement errors the real store raises. The one failure it does
+/// reproduce is reading back a stored value that is not valid UTF-8 as a string.
+///
+/// Being an actor, it is safe to share between tasks.
 public actor InMemorySecureStore: SecureStore {
 
     private var storage: [String: Data] = [:]
@@ -48,7 +54,7 @@ public actor InMemorySecureStore: SecureStore {
         storage[key] != nil
     }
 
-    /// 格納エントリ数（テストアサーション用）。
+    /// How many keys hold a value, so a test can assert on the size without listing them.
     public var count: Int {
         storage.count
     }

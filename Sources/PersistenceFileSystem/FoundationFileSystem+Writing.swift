@@ -1,7 +1,15 @@
 import Foundation
 import PersistenceCore
 
-/// `FileManager` をバックエンドとする ``FileSystemWriting`` 実装。読み取り側と対になる。
+/// The writing half of the disk-backed file tree.
+///
+/// Every write creates the missing parent directories first, replaces files atomically, and
+/// treats deleting something absent as success. None of it is flushed, so the bytes are only as
+/// durable as the file system's own scheduling.
+///
+/// A call that takes more than one step is not undone if a later step fails: a move whose
+/// destination directory was created but whose rename then failed leaves the empty directory
+/// behind.
 extension FoundationFileSystem: FileSystemWriting {
 
     public func createDirectory(_ url: URL) async throws {

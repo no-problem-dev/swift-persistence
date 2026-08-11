@@ -1,25 +1,33 @@
 import Foundation
 
-/// キー付きエントリの JSON バックドレジストリ。
+/// A whole map of keyed entries, read and written as one unit.
 ///
-/// 文字列キーからメタデータエントリへのマッピングを
-/// 単一 JSON ファイルで管理するパターンを汎化する。
-/// モデルキャッシュやアダプタキャッシュのレジストリなどで活用する。
+/// This suits a registry small enough to hold in memory and rewrite in full, such as a cache
+/// index. The expected shape is that a consumer, usually an actor, reads the map once at
+/// start-up, keeps it in memory, mutates it, and writes the whole thing back after each change.
+/// There is no per-entry read or write.
 ///
-/// 消費側コード（通常はアクター）がメモリ内辞書を保持し、
-/// 初期化時に `load()` を、更新後に `save(_:)` を呼ぶ。
+/// Keys are dictionary keys, so duplicates cannot arise and no order is kept. A caller that
+/// wants a stable order has to sort the keys itself.
 ///
-/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
-///
-/// 実装: ``FileSystemRegistryStore``, ``InMemoryRegistryStore``。
+/// Implementations: ``FileSystemRegistryStore``, ``InMemoryRegistryStore``.
 public protocol RegistryStore<Entry>: Sendable {
     associatedtype Entry: Codable & Sendable
 
-    /// レジストリ全体をストレージから読み込む。
+    /// Reads the whole registry.
     ///
-    /// レジストリが存在しない・デコードできない場合は空辞書を返す。
+    /// This cannot fail. A registry that is missing, unreadable or corrupt all arrive as an empty
+    /// dictionary, indistinguishable from one that was never written. A caller that has to tell
+    /// "empty" from "broken" must look at the backing storage itself.
     func load() async -> [String: Entry]
 
-    /// レジストリ全体をストレージにアトミックに保存する。
+    /// Writes the whole registry, replacing what was there.
+    ///
+    /// A replacement, not a merge: keys absent from the argument are gone afterwards.
+    /// Implementations replace it atomically, so a reader sees either the previous contents or
+    /// the new ones and never a partial write.
+    ///
+    /// - Throws: ``PersistenceError/encodingFailed(key:reason:)`` when an entry cannot be
+    ///   encoded, or ``PersistenceError/storageFailed(operation:reason:)`` when the write fails.
     func save(_ registry: [String: Entry]) async throws
 }

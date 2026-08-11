@@ -1,52 +1,60 @@
 import Foundation
 
-/// 書き込み側ファイルシステム抽象 — ``FileSystemReading`` の対。
+/// Write access to a tree of files and directories, decoupled from the real disk.
 ///
-/// `FileManager` に依存せず、ディレクトリ作成・ファイル書き込み・
-/// 削除・移動を抽象化する。消費側コード（例: スキルルート下の `SKILL.md` 生成）を
-/// テスト容易にし、サンドボックスやリモートバックエンドへの差し替えを可能にする。
+/// This is the counterpart to ``FileSystemReading``, and both shipped backends conform to the
+/// two together, so code that reads and writes a tree can take one value for both.
 ///
-/// ``FileSystemReading`` と組み合わせて、単一バックエンド
-/// （ディスクは ``FoundationFileSystem``、テストは ``InMemoryFileSystem``）が
-/// 読み書き両方に対応する。
+/// Every call stands alone. Nothing here is transactional, so a call that fails after creating a
+/// directory leaves that directory behind.
 ///
-/// 実装は I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
+/// The methods are `async` so an implementation can keep blocking I/O off the caller's actor.
 ///
-/// 実装: ``FoundationFileSystem``, ``InMemoryFileSystem``。
+/// Implementations: ``FoundationFileSystem``, ``InMemoryFileSystem``.
 public protocol FileSystemWriting: Sendable {
 
-    /// 指定 URL にディレクトリを作成する。中間ディレクトリも必要に応じて生成。
+    /// Creates a directory along with any missing parents.
     ///
-    /// 冪等: ディレクトリが既に存在する場合もエラーにならない。
+    /// Calling this on a directory that already exists succeeds and changes nothing, so callers
+    /// need not check first.
     ///
-    /// - Throws: ディレクトリを作成できない場合は ``PersistenceError/directoryCreationFailed(path:reason:)``。
+    /// - Throws: ``PersistenceError/directoryCreationFailed(path:reason:)``, which is also how a
+    ///   file already occupying the URL is reported.
     func createDirectory(_ url: URL) async throws
 
-    /// 指定 URL のファイルに `data` をアトミックに書き込む。既存ファイルは上書き。
+    /// Replaces the file at this URL with these bytes, creating parent directories as needed.
     ///
-    /// 親ディレクトリが存在しない場合も自動的に作成するため、
-    /// 1 回の `write` だけで新規パスへのファイル生成が完結する。
+    /// The replacement is atomic in that a reader sees either the previous file or the new one,
+    /// never a half-written one. It is not durable: the bytes are not flushed, so a power loss
+    /// straight after the call can still lose them.
     ///
-    /// - Throws: 書き込みエラーは ``PersistenceError/storageFailed(operation:reason:)``。
+    /// - Throws: ``PersistenceError/directoryCreationFailed(path:reason:)`` when the parent
+    ///   directory cannot be made, ``PersistenceError/storageFailed(operation:reason:)`` when the
+    ///   write fails.
     func write(_ data: Data, to url: URL) async throws
 
-    /// 指定 URL のファイルまたはディレクトリを再帰的に削除する。
+    /// Deletes a file, or a directory together with everything inside it.
     ///
-    /// 冪等: 指定 URL に何も存在しない場合もエラーにならない。
+    /// Deleting something that is not there succeeds and changes nothing. The call does not
+    /// report whether anything was actually removed.
     ///
-    /// - Throws: 削除エラーは ``PersistenceError/storageFailed(operation:reason:)``。
+    /// - Throws: ``PersistenceError/storageFailed(operation:reason:)``.
     func removeItem(_ url: URL) async throws
 
-    /// `source` のファイルまたはディレクトリをサブツリーごと `destination` に移動する。
+    /// Moves a file, or a whole directory subtree, to another location.
     ///
-    /// - Throws: `source` が存在しない場合は ``PersistenceError/notFound(key:)``。
-    ///   `destination` が既に存在するか移動が失敗した場合は ``PersistenceError/storageFailed(operation:reason:)``。
+    /// Never overwrites: an occupied destination is an error rather than a replacement. Missing
+    /// parent directories of the destination are created first.
+    ///
+    /// - Throws: ``PersistenceError/notFound(key:)`` when the source is missing,
+    ///   ``PersistenceError/storageFailed(operation:reason:)`` when the destination is occupied
+    ///   or the move fails.
     func moveItem(from source: URL, to destination: URL) async throws
 }
 
 extension FileSystemWriting {
 
-    /// 指定 URL のファイルに文字列を UTF-8 で書き込む。
+    /// Writes text to a file as UTF-8 bytes, replacing it as atomically as the byte overload does.
     public func write(_ string: String, to url: URL) async throws {
         try await write(Data(string.utf8), to: url)
     }

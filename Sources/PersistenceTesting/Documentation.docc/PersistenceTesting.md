@@ -1,81 +1,92 @@
 # ``PersistenceTesting``
 
-全 `swift-persistence` プロトコル対応のインメモリテストダブル — テストにディスク・Keychain・エンタイトルメントは不要。
+In-memory test doubles for every persistence protocol — no disk, no Keychain, no entitlements.
 
 ## Overview
 
-`PersistenceTesting` は `PersistenceCore` で定義される全プロトコルに対応するドロップイン型のインメモリダブルを提供する。ダブルはアクター分離によりデータレース安全で、決定的なテストセットアップのためにシードデータを事前設定できる。プロトコル型を通じて注入することでプロダクションコードはバックエンドを意識しない。
+`PersistenceTesting` provides a drop-in, in-memory double for every protocol defined in `PersistenceCore`. All of them are data-race safe: five are actors, and `InMemoryKeyResolver` is an immutable value type. Injecting them through protocol types keeps production code unaware of which backend it is running against.
 
 ```swift
+import PersistenceCore
 import PersistenceTesting
 
-// プロトコル型で注入 — プロダクションバックエンドと同じインターフェース
+// Inject through protocol types — the same interface as the production backends
 let store: any KeyValueStore = InMemoryKeyValueStore()
 let secrets: any SecureStore = InMemorySecureStore()
-let docs: any DocumentStore = InMemoryDocumentStore<Note>()
-let registry: any RegistryStore = InMemoryRegistryStore<ModelRecord>()
+let docs: any DocumentStore<Note> = InMemoryDocumentStore<Note>()
+let registry: any RegistryStore<ModelRecord> = InMemoryRegistryStore<ModelRecord>()
 let fs: any FileSystemReading & FileSystemWriting = InMemoryFileSystem()
 let resolver: any KeyResolver = InMemoryKeyResolver(["API_KEY": "test-key-abc"])
 ```
 
-各ダブルはプロダクション版の挙動に合わせる: `InMemoryKeyValueStore` と `InMemorySecureStore` は値を `JSONEncoder`/`JSONDecoder` でラウンドトリップし、`InMemoryDocumentStore` は存在しない ID に対して ``PersistenceError/notFound(key:)`` をスローし、`InMemoryFileSystem` は初回書き込み時に先祖ディレクトリツリーを自動構築する。
+Each double matches the observable behaviour of its production counterpart: `InMemoryKeyValueStore` round-trips values through `JSONEncoder` and `JSONDecoder`, `InMemorySecureStore` stores raw bytes and converts strings as UTF-8 exactly as the Keychain store does, `InMemoryDocumentStore` throws ``PersistenceError/notFound(key:)`` for an unknown ID, and `InMemoryFileSystem` registers the ancestor directories of a path on the first write.
 
-### シードデータの事前設定
+### Seeding fixture data
 
-`InMemoryFileSystem` 以外の全ダブルにはシード用のコンビニエンスイニシャライザがある:
+`InMemoryKeyValueStore`, `InMemoryRegistryStore`, and `InMemoryKeyResolver` take their initial contents in an initialiser:
 
 ```swift
-// 複数の型を混在させてキーバリューストアを事前設定
+// Preload a key-value store, mixing value types
 let kvStore = InMemoryKeyValueStore(["theme": "dark", "fontSize": 16])
 
-// レジストリを事前設定
+// Preload a registry
 let regStore = InMemoryRegistryStore(["llama-3b": ModelRecord(downloadedAt: .now, sizeBytes: 1_800_000_000)])
 
-// API キー注入用の固定リゾルバ
+// A fixed resolver for injecting API keys
 let resolver = InMemoryKeyResolver(["OPENAI_API_KEY": "sk-test-abc"])
 ```
 
-`InMemoryFileSystem` はテスト対象のシステムが実行される前に `addFile` と `addDirectory` メソッドでプログラム的に構築する:
+`InMemoryDocumentStore` and `InMemorySecureStore` have no seeding initialiser. Fill them through their regular write methods before exercising the system under test:
+
+```swift
+let docs = InMemoryDocumentStore<Note>()
+try await docs.save(Note(id: noteID, title: "Draft", body: ""))
+
+let secrets = InMemorySecureStore()
+try await secrets.setString("sk-test-abc", forKey: "openai_api_key")
+```
+
+Build `InMemoryFileSystem` programmatically with its `addFile` and `addDirectory` methods:
 
 ```swift
 let fs = InMemoryFileSystem()
 
-// ツリーを構築
+// Build the tree
 let root = URL(fileURLWithPath: "/skills")
 await fs.addFile(root.appendingPathComponent("writing/SKILL.md"), string: "# Writing\n")
 await fs.addFile(root.appendingPathComponent("coding/SKILL.md"), string: "# Coding\n")
 
-// テスト対象のシステムがディスクに触れることなくツリーを走査する
+// The system under test walks the tree without touching disk
 let items = try await fs.contentsOfDirectory(root)
 ```
 
-### アサーションヘルパー
+### Assertion helpers
 
-`InMemoryKeyValueStore`・`InMemorySecureStore`・`InMemoryDocumentStore`・`InMemoryRegistryStore` はそれぞれ簡潔な XCTest アサーション用の `count` プロパティを持つ:
+`InMemoryKeyValueStore`, `InMemorySecureStore`, `InMemoryDocumentStore`, and `InMemoryRegistryStore` each expose a `count` property for concise assertions:
 
 ```swift
 let store = InMemoryDocumentStore<Note>()
 try await store.save(Note(id: UUID(), title: "Draft", body: ""))
 let count = await store.count
-XCTAssertEqual(count, 1)
+#expect(count == 1)
 ```
 
 ## Topics
 
-### キーバリュー・セキュアストレージダブル
+### Key-Value and Secure Storage Doubles
 
 - ``InMemoryKeyValueStore``
 - ``InMemorySecureStore``
 
-### ドキュメント・レジストリストレージダブル
+### Document and Registry Storage Doubles
 
 - ``InMemoryDocumentStore``
 - ``InMemoryRegistryStore``
 
-### ファイルシステムダブル
+### File System Doubles
 
 - ``InMemoryFileSystem``
 
-### キー解決ダブル
+### Key Resolution Doubles
 
 - ``InMemoryKeyResolver``

@@ -1,32 +1,46 @@
 import Foundation
 
-/// 複数のソースを優先順位順に試して値を解決するリゾルバ。
+/// Looks up a configuration value by name, trying several places in a fixed order.
 ///
-/// Info.plist → Keychain → UserDefaults の順に設定値を探す
-/// 一般的なパターンを抽象化する。
+/// A setting such as an API key can arrive from more than one place depending on how the app was
+/// built and what it did in earlier versions. This hides that ordering from callers, who ask for
+/// a logical name and receive whatever the first place to answer held.
 ///
-/// 実装: ``ChainedKeyResolver``, ``InMemoryKeyResolver``。
+/// Implementations: ``ChainedKeyResolver``, ``InMemoryKeyResolver``.
 public protocol KeyResolver: Sendable {
 
-    /// 指定の論理キーに対して文字列値を解決する。
+    /// Returns the first value found for a logical key name.
     ///
-    /// - Returns: 解決した値。どのソースにも値がない場合は `nil`。
+    /// - Returns: `nil` when no source held one. Resolution does not throw, so a source that
+    ///   failed and a source that had nothing are indistinguishable from here.
     func resolve(_ key: String) async -> String?
 }
 
-/// Info.plist → SecureStore → KeyValueStore の順に値を解決するリゾルバ。
+/// Looks in the app bundle first, then secure storage, then the key-value store.
+///
+/// The order encodes a migration. A value compiled in at build time wins; secure storage is
+/// where the value is meant to live; the key-value store is read last only so that a value
+/// written by an older version is still found.
+///
+/// A blank value counts as absent, as does an unsubstituted build setting, so a placeholder left
+/// in the bundle does not shadow a real credential further down the chain.
 public struct ChainedKeyResolver: KeyResolver, Sendable {
 
     private let infoPlistLookup: @Sendable (String) -> String?
     private let secureStore: any SecureStore
     private let keyValueStore: any KeyValueStore
 
-    /// 論理キー名を各ストアでの実ストレージキーにマッピングする辞書。
+    /// Maps each logical key name onto the concrete key it has in each backing store.
     ///
-    /// 例: `"ANTHROPIC_API_KEY"` → `(secure: "anthropic_api_key", kv: "anthropic_api_key")`
+    /// A name missing from this map is looked up in the bundle only; the other two sources are
+    /// skipped, so an unmapped key silently resolves to `nil` even when secure storage holds it
+    /// under the same name.
     private let keyMapping: [String: StorageKeys]
 
-    /// 論理キーに対応する各ストアでの実ストレージキーのペア。
+    /// The concrete key names one logical name has in the two backing stores.
+    ///
+    /// They need not match, which is what lets a value keep its legacy name in the key-value
+    /// store while moving to a new one in secure storage.
     public struct StorageKeys: Sendable {
         public let secure: String
         public let keyValue: String
@@ -37,14 +51,17 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
         }
     }
 
-    /// チェーンドキーリゾルバを生成する。
+    /// Creates a resolver over the three sources, listed in the order they will be tried.
     ///
     /// - Parameters:
-    ///   - infoPlistLookup: Info.plist から値を参照するクロージャ。
-    ///     デフォルトは `Bundle.main.infoDictionary` 参照。
-    ///   - secureStore: 2 番目に参照するセキュアストレージ（Keychain）。
-    ///   - keyValueStore: 最後に参照するキーバリューストレージ（UserDefaults、マイグレーション用フォールバック）。
-    ///   - keyMapping: 論理キー名を各ストアのキーにマッピングする辞書。
+    ///   - infoPlistLookup: Reads a value from the app bundle. The default reads
+    ///     `Bundle.main.infoDictionary`, which is normally filled from an xcconfig at build time.
+    ///     Replace it in tests so resolution does not depend on the host bundle.
+    ///   - secureStore: Tried second, and where values are expected to live.
+    ///   - keyValueStore: Tried last, and only so that values written by an older version are
+    ///     still found.
+    ///   - keyMapping: The concrete key names to use in the two stores. Names absent from it are
+    ///     looked up in the bundle only.
     public init(
         infoPlistLookup: @escaping @Sendable (String) -> String? = { key in
             Bundle.main.infoDictionary?[key] as? String
@@ -60,7 +77,8 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
     }
 
     public func resolve(_ key: String) async -> String? {
-        // 1. Info.plist (xcconfig 経由のビルド時注入)
+        // 1. App bundle, normally injected at build time from an xcconfig.
+        // A value still starting with "$(" is an unsubstituted build setting, not a credential.
         if let value = infoPlistLookup(key),
            !value.isEmpty,
            !value.hasPrefix("$(") {
@@ -69,16 +87,17 @@ public struct ChainedKeyResolver: KeyResolver, Sendable {
 
         guard let mapping = keyMapping[key] else { return nil }
 
-        // 2. SecureStore (Keychain)
-        // `try?` は意図的: エンタイトルメント不足や一時的な Keychain エラーは
-        // 「このソースに値なし」として扱い、次のソースへグレースフルにフォールスルーさせる。
+        // 2. Secure storage.
+        // The `try?` is deliberate: a missing entitlement or a locked device is treated as "no
+        // value here" so the next source still gets its turn.
         if let value = try? await secureStore.getString(forKey: mapping.secure),
            !value.isEmpty {
             return value
         }
 
-        // 3. KeyValueStore (UserDefaults — マイグレーション中のレガシーフォールバック)
-        // 同様に意図的な `try?`: 古いエントリのデコードエラーもサイレントにフォールスルー。
+        // 3. Key-value store, the legacy location still read during migration.
+        // Deliberate for the same reason: an entry written by an older version may no longer
+        // decode, and that should read as "not here" rather than fail the lookup.
         if let value = try? await keyValueStore.string(forKey: mapping.keyValue),
            !value.isEmpty {
             return value

@@ -1,30 +1,42 @@
 import Foundation
 import PersistenceCore
 
-/// 単一の JSON ファイルでレジストリを永続化する ``RegistryStore`` 実装。
+/// Keeps a whole registry in one JSON file, rewritten in full on every save.
 ///
-/// 文字列キーから `Codable` メタデータエントリへのマッピングを
-/// 単一 JSON ファイルで管理するレジストリパターンを汎化する。
-/// ファイルの読み書きはアトミックに行う。
+/// A save replaces the file with exactly the dictionary it is given, so entries the caller
+/// dropped are gone from disk. Nothing is cached, so every read parses the file again.
 ///
-/// アクターとして実装することで、ファイル I/O を
-/// 呼び出し元アクター（例: `@MainActor`）からアクターホップで自動的に切り離す。
+/// A registry that cannot be read comes back empty. A missing file, truncated JSON and an entry
+/// that no longer matches `Entry` are all reported the same way, without an error and without a
+/// log line, so a schema change silently empties the registry and the next save overwrites the
+/// file that could have been recovered by hand. Keep a copy before changing `Entry` if the
+/// contents matter.
+///
+/// The file is written atomically, so a reader sees either the previous registry or the new one.
+/// It is not flushed, so a power loss just after a save can still lose it. Keys are sorted in the
+/// output, which keeps successive saves diffable.
+///
+/// Being an actor, calls are serialised and the synchronous file I/O runs on the store's own
+/// executor rather than the caller's.
 public actor FileSystemRegistryStore<Entry: Codable & Sendable>: RegistryStore {
 
     private let registryURL: URL
 
-    /// ファイル URL 指定でファイルシステムレジストリストアを生成する。
+    /// Creates a store over one registry file, without touching the disk yet.
     ///
-    /// - Parameter registryURL: JSON レジストリファイルのフルパス。
+    /// Neither the file nor its directory is created here. The directory appears on the first
+    /// successful save, so an unwritable path only shows up then.
+    ///
+    /// - Parameter registryURL: Full path of the JSON file, file name included.
     public init(registryURL: URL) {
         self.registryURL = registryURL
     }
 
-    /// ディレクトリとファイル名指定でファイルシステムレジストリストアを生成する。
+    /// Creates a store over a registry file inside a directory, without touching the disk yet.
     ///
     /// - Parameters:
-    ///   - directory: レジストリファイルを含むディレクトリ。
-    ///   - filename: レジストリファイル名。デフォルトは `"registry.json"`。
+    ///   - directory: Directory holding the file. Created on the first successful save, not now.
+    ///   - filename: Name of the file within that directory.
     public init(directory: URL, filename: String = "registry.json") {
         self.registryURL = directory.appendingPathComponent(filename)
     }

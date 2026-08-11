@@ -1,13 +1,19 @@
 import Foundation
 import PersistenceCore
 
-/// 個別の JSON ファイルでドキュメントを永続化する ``DocumentStore`` 実装。
+/// Keeps each document in its own JSON file inside a single directory.
 ///
-/// ドキュメントは設定ディレクトリ内の `{id}.json` として保存される。
-/// 全ファイル書き込みはアトミックで、データ破損を防ぐ。
+/// A document's file name is its identifier followed by `.json`, so the identifier's text is
+/// what a key resolves to on disk. It is used verbatim, with no escaping: an identifier holding a
+/// slash lands in a subdirectory, and since only the store's own directory is created, saving it
+/// fails. Identifiers must be usable as a single path component.
 ///
-/// アクターとして実装することで、ファイル I/O を
-/// 呼び出し元アクター（例: `@MainActor`）からアクターホップで自動的に切り離す。
+/// A save replaces the file atomically, so a reader never sees a half-written document. It is not
+/// flushed, so a power loss just after a save can still lose it. Nothing is cached, so every read
+/// goes to disk and picks up changes made by anything else writing the same directory.
+///
+/// Being an actor, calls are serialised and the file I/O runs off the caller's actor. The I/O
+/// itself is synchronous, so a call holds the store's executor for the whole read or write.
 public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: DocumentStore
     where T.ID: CustomStringConvertible & Sendable
 {
@@ -17,13 +23,16 @@ public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: Docu
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// ファイルシステムドキュメントストアを生成する。
+    /// Creates the store together with the directory it will write into.
     ///
     /// - Parameters:
-    ///   - directory: ドキュメントファイルを格納するディレクトリ。存在しない場合は作成する。
-    ///   - encoder: カスタム JSON エンコーダー。デフォルトは ISO 8601 日付・プリティプリント・ソートキー。
-    ///   - decoder: カスタム JSON デコーダー。デフォルトは ISO 8601 日付。
-    /// - Throws: ディレクトリを作成できない場合は ``PersistenceError/directoryCreationFailed(path:reason:)``。
+    ///   - directory: Where the document files go. It and any missing parents are created here,
+    ///     which is the only reason this initialiser can fail.
+    ///   - encoder: Defaults to ISO 8601 dates with pretty-printed, key-sorted output, which
+    ///     keeps the files readable and makes successive saves diff cleanly.
+    ///   - decoder: Defaults to ISO 8601 dates, matching the default encoder. Passing an encoder
+    ///     and decoder whose date strategies disagree makes documents unreadable after a save.
+    /// - Throws: ``PersistenceError/directoryCreationFailed(path:reason:)``.
     public init(
         directory: URL,
         encoder: JSONEncoder? = nil,
@@ -108,6 +117,12 @@ public actor FileSystemDocumentStore<T: Codable & Identifiable & Sendable>: Docu
         }
     }
 
+    /// Reads every document in the directory, in whatever order the file system lists them.
+    ///
+    /// Files that cannot be read or decoded are skipped without a word, so a document left over
+    /// from an older schema disappears from the result instead of failing the call. That makes a
+    /// short result impossible to tell from a small store. Only files ending in `.json` are
+    /// considered, and subdirectories are not descended into.
     public func loadAll() throws -> [T] {
         guard FileManager.default.fileExists(atPath: directory.path) else {
             return []

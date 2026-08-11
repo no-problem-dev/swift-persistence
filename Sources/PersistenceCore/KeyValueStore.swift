@@ -1,30 +1,39 @@
 import Foundation
 
-/// 型安全なキーバリューストレージ抽象。
+/// Small keyed values that outlive a launch: settings, flags, timestamps.
 ///
-/// `UserDefaults` など KV ストアをプロトコルでラップし、
-/// DI による差し替えとテスト容易性を実現する。
+/// Wrapping the defaults database behind a protocol is what lets a test hand the same code an
+/// in-memory double. It suits values small enough to keep in memory for the life of the process;
+/// whole records belong in ``DocumentStore``.
 ///
-/// 実装はファイル I/O を呼び出し元アクターから切り離せるよう `async` メソッドを採用する。
+/// This is not a security boundary. The shipped implementation writes a plain property list
+/// inside the app container that anything with access to the container can read, and that goes
+/// into backups. Secrets belong in ``SecureStore``.
 ///
-/// 実装: ``UserDefaultsKeyValueStore``, ``InMemoryKeyValueStore``。
+/// Implementations: ``UserDefaultsKeyValueStore``, ``InMemoryKeyValueStore``.
 public protocol KeyValueStore: Sendable {
 
-    /// 指定キーの `Codable` 値を読み込む。
+    /// Reads what a key holds and decodes it as the requested type.
     ///
-    /// - Returns: デコードした値。キーが存在しない場合は `nil`。
-    /// - Throws: 格納データのデコードに失敗した場合は ``PersistenceError/decodingFailed(key:reason:)``。
+    /// - Returns: `nil` when the key holds nothing.
+    /// - Throws: ``PersistenceError/decodingFailed(key:reason:)`` when bytes are present but do
+    ///   not decode into `T`. An implementation that hands primitives to its backing store
+    ///   unencoded may answer a type mismatch with `nil` instead of throwing, so a `nil` here is
+    ///   not proof that the key is empty.
     func value<T: Codable & Sendable>(forKey key: String, type: T.Type) async throws -> T?
 
-    /// 指定キーに `Codable` 値を書き込む。
+    /// Writes a value under a key, replacing whatever it held.
     ///
-    /// - Throws: 値のエンコードに失敗した場合は ``PersistenceError/encodingFailed(key:reason:)``。
+    /// Returning does not mean the value has reached disk. When it does is up to the
+    /// implementation.
+    ///
+    /// - Throws: ``PersistenceError/encodingFailed(key:reason:)``.
     func setValue<T: Codable & Sendable>(_ value: T, forKey key: String) async throws
 
-    /// 指定キーの値を削除する。キーが存在しない場合もエラーにならない。
+    /// Removes what a key holds. Removing a key that holds nothing is not an error.
     func removeValue(forKey key: String) async throws
 
-    /// 指定キーに値が存在する場合に `true` を返す。
+    /// Reports whether a key holds a value, without decoding it.
     func contains(key: String) async -> Bool
 }
 
@@ -32,27 +41,25 @@ public protocol KeyValueStore: Sendable {
 
 extension KeyValueStore {
 
-    /// `String` 値を読み込む。
     public func string(forKey key: String) async throws -> String? {
         try await value(forKey: key, type: String.self)
     }
 
-    /// `Bool` 値を読み込む。
+    /// Reads a Boolean, distinguishing a key that was never set from one holding false.
     public func bool(forKey key: String) async throws -> Bool? {
         try await value(forKey: key, type: Bool.self)
     }
 
-    /// `Data` 値を読み込む。
     public func data(forKey key: String) async throws -> Data? {
         try await value(forKey: key, type: Data.self)
     }
 
-    /// `Int` 値を読み込む。
+    /// Reads an integer, distinguishing a key that was never set from one holding zero.
     public func int(forKey key: String) async throws -> Int? {
         try await value(forKey: key, type: Int.self)
     }
 
-    /// `Double` 値を読み込む。
+    /// Reads a floating-point value, distinguishing a key that was never set from one holding zero.
     public func double(forKey key: String) async throws -> Double? {
         try await value(forKey: key, type: Double.self)
     }

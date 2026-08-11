@@ -2,28 +2,36 @@ import Foundation
 import Security
 import PersistenceCore
 
-/// Keychain アイテムのアクセシビリティポリシー。
+/// How soon after a restart an item can be read, and whether it survives onto another device.
 ///
-/// `kSecAttrAccessible` 属性にマッピングされる。`thisDeviceOnly` バリアントは
-/// iCloud Keychain 同期を抑制し、クレデンシャルのデバイス外への漏洩を防ぐ。
+/// These map onto the `kSecAttrAccessible` attribute. The `thisDeviceOnly` variants are left out
+/// of encrypted backups, so the credential is absent after a restore onto new hardware and the
+/// app has to obtain it again; the other two travel in the backup.
+///
+/// None of them makes an item sync through iCloud Keychain. That needs the separate
+/// `kSecAttrSynchronizable` attribute, which this store never sets, so no item written here ever
+/// leaves the device except through a backup.
 public enum KeychainAccessibility: Sendable {
-    /// デバイスのロック解除中のみアクセス可能。iCloud Keychain に同期しない。
+    /// Readable only while the device is unlocked, and left behind by a restore onto new hardware.
     ///
-    /// 認証トークン・機密クレデンシャルの推奨デフォルト
-    /// （Apple Review §2.1 データ保護要件に準拠）。
+    /// The default, and the right choice for auth tokens and API keys: unreadable while the
+    /// screen is locked, and never present in a backup.
     case whenUnlockedThisDeviceOnly
 
-    /// デバイスのロック解除中のみアクセス可能。iCloud Keychain に同期する。
+    /// Readable only while the device is unlocked, and carried into encrypted backups.
     ///
-    /// 複数デバイス間でクレデンシャルを共有する必要がある場合に使用。
+    /// Choose this when the credential should survive the user replacing their device.
     case whenUnlocked
 
-    /// 再起動後の初回ロック解除以降アクセス可能。iCloud Keychain に同期しない。
+    /// Readable from the first unlock after a restart onwards, and left behind by a restore.
     ///
-    /// バックグラウンドタスクが必要とするクレデンシャルに使用。
+    /// What background work needs, since it may run while the screen is locked. The cost is that
+    /// the value stays readable for the rest of the boot, locked screen or not.
     case afterFirstUnlockThisDeviceOnly
 
-    /// 再起動後の初回ロック解除以降アクセス可能。iCloud Keychain に同期する。
+    /// Readable from the first unlock after a restart onwards, and carried into encrypted backups.
+    ///
+    /// The most permissive of the four.
     case afterFirstUnlock
 
     var rawValue: CFString {
@@ -40,28 +48,40 @@ public enum KeychainAccessibility: Sendable {
     }
 }
 
-/// システム Keychain をバックエンドとする ``SecureStore`` 実装。
+/// Stores secrets in the system Keychain, one generic-password item per key.
 ///
-/// `kSecClassGenericPassword` と設定可能なサービス名を使用する。
-/// 各キーはアカウント属性にキーを設定した独立した Keychain アイテムとして格納される。
+/// A key becomes the account attribute of its own item under a shared service name, so two
+/// stores built with different service names never see each other's items, and deleting one key
+/// leaves the rest alone. Nothing is cached: every call is an IPC round trip to the Keychain.
 ///
-/// アクターとして実装することで、Keychain IPC を呼び出し元アクターから切り離し、
-/// データレース安全性を確保する。
+/// Items are readable only under the accessibility class given at initialisation, by default
+/// while the device is unlocked and only on this device. With an access group, every target
+/// carrying that same group entitlement reads the same items, which is how an app shares a
+/// credential with its extensions; without one, the items belong to this app alone.
+///
+/// Being an actor, calls are serialised and run off the caller's actor. The Keychain calls are
+/// synchronous and hold the store's executor while the daemon answers. A read attempted while
+/// the item is not accessible fails immediately rather than waiting for the device to unlock.
 public actor KeychainSecureStore: SecureStore {
 
     private let service: String
     private let accessGroup: String?
     private let accessibility: KeychainAccessibility
 
-    /// Keychain バックドセキュアストアを生成する。
+    /// Creates a store over one Keychain service, without reaching the Keychain yet.
+    ///
+    /// Nothing is read or written here, so an initialiser that returns says nothing about whether
+    /// the Keychain is usable. A missing entitlement surfaces on the first read or write.
     ///
     /// - Parameters:
-    ///   - service: Keychain サービス識別子。デフォルトはアプリのバンドル識別子。
-    ///   - accessGroup: アプリ・エクステンション間の Keychain 共有に使うアクセスグループ（省略可）。
-    ///   - accessibility: Keychain アイテムのアクセシビリティポリシー。デフォルトは
-    ///     ``KeychainAccessibility/whenUnlockedThisDeviceOnly`` — デバイスのロック解除中のみ
-    ///     読み取り可能で iCloud Keychain に同期しない。認証トークン・API キーの推奨デフォルト
-    ///     （Apple Review §2.1 データ保護に準拠）。
+    ///   - service: Namespace for this store's items. Defaults to the bundle identifier, falling
+    ///     back to a fixed string when there is none, which is the case in command-line tools and
+    ///     some test runners; two such processes would then share one namespace.
+    ///   - accessGroup: Shares the items with every target carrying the same keychain access
+    ///     group entitlement. `nil` keeps them private to this app.
+    ///   - accessibility: When items may be read, and whether they survive a restore onto new
+    ///     hardware. This applies to items written from now on; items already in the Keychain keep
+    ///     the class they were written with until they are written again.
     public init(
         service: String = Bundle.main.bundleIdentifier ?? "com.app.persistence",
         accessGroup: String? = nil,
@@ -95,6 +115,13 @@ public actor KeychainSecureStore: SecureStore {
         try setData(data, forKey: key)
     }
 
+    /// Reads the bytes held under a key.
+    ///
+    /// - Returns: `nil` when no item exists under the key.
+    /// - Throws: ``PersistenceError/accessDenied(reason:)`` for every other failure, carrying the
+    ///   raw `OSStatus`. Despite the name that covers more than permissions: a read while the
+    ///   device is locked and a query the Keychain rejected arrive the same way, so read the
+    ///   status before concluding an entitlement is missing.
     public func getData(forKey key: String) throws -> Data? {
         var query = baseQuery(forKey: key)
         query[kSecReturnData as String] = true
@@ -115,6 +142,10 @@ public actor KeychainSecureStore: SecureStore {
         }
     }
 
+    /// Writes bytes under a key, replacing any existing item and resetting its accessibility.
+    ///
+    /// An item written before the store was created with a different accessibility class is
+    /// brought onto the current one by this call.
     public func setData(_ value: Data, forKey key: String) throws {
         let query = baseQuery(forKey: key)
         let attributes: [String: Any] = [
@@ -122,11 +153,11 @@ public actor KeychainSecureStore: SecureStore {
             kSecAttrAccessible as String: accessibility.rawValue,
         ]
 
-        // まず更新を試みる
+        // Update first: adding on top of an existing item fails with errSecDuplicateItem.
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
 
         if status == errSecItemNotFound {
-            // アイテムが存在しない場合は追加する
+            // First write for this key, so there is nothing to update.
             var addQuery = query
             addQuery[kSecValueData as String] = value
             addQuery[kSecAttrAccessible as String] = accessibility.rawValue

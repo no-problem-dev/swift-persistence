@@ -1,9 +1,15 @@
 import Foundation
 import PersistenceCore
 
-/// テスト用のインメモリ ``KeyValueStore``。
+/// Keeps key-value entries in memory as JSON, for use in tests.
 ///
-/// アクター分離によりロック同期を置き換え、データレース安全を実現する。
+/// Every value goes through `JSONEncoder` and `JSONDecoder`, strings and numbers included, which
+/// makes this the stricter of the two implementations: reading a key as the wrong type throws
+/// ``PersistenceError/decodingFailed(key:reason:)`` here, where the defaults-backed store would
+/// answer `nil` or coerce the value. Code that passes against this store can still surprise
+/// against the real one.
+///
+/// Nothing survives the process. Being an actor, it is safe to share between tasks.
 public actor InMemoryKeyValueStore: KeyValueStore {
 
     private var storage: [String: Data] = [:]
@@ -15,7 +21,10 @@ public actor InMemoryKeyValueStore: KeyValueStore {
         self.decoder = JSONDecoder()
     }
 
-    /// 指定した値で初期状態を持つインメモリストアを生成する。
+    /// Creates a store already holding these values.
+    ///
+    /// A value that fails to encode is dropped without a word, so a store built this way can hold
+    /// fewer entries than were passed in.
     public init(_ initial: [String: any Codable & Sendable]) {
         let encoder = JSONEncoder()
         self.encoder = encoder
@@ -53,7 +62,7 @@ public actor InMemoryKeyValueStore: KeyValueStore {
         storage[key] != nil
     }
 
-    /// 格納エントリ数（テストアサーション用）。
+    /// How many keys hold a value, so a test can assert on the size without listing them.
     public var count: Int {
         storage.count
     }
@@ -61,7 +70,10 @@ public actor InMemoryKeyValueStore: KeyValueStore {
 
 // MARK: - CodableWrapper
 
-/// 初期値エンコード用の `any Codable` ラッパー。
+/// Carries an existential value long enough to encode it.
+///
+/// `any Codable` cannot be handed to `JSONEncoder` directly, so each initial value is wrapped in
+/// one of these, which forwards `encode(to:)` to the value it captured.
 private struct CodableWrapper: Encodable {
     private let encode: (Encoder) throws -> Void
 

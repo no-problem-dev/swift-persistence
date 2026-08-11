@@ -2,23 +2,58 @@
 
 # SwiftPersistence
 
-プロトコル指向の永続化抽象レイヤー Swift パッケージ
+プロトコル指向の永続化抽象レイヤー。
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+ドメイン層・ユースケース層はプロトコルにだけ依存し、それを `UserDefaults` で満たすのか、
+Keychain なのか、ファイルなのか、何も持たないのかは合成ルートが決めます。
+
 ## 特徴
 
-- **プロトコル指向** - 全永続化操作を抽象プロトコルで定義、DI でテスト容易な設計
-- **KeyValueStore** - UserDefaults の型安全な抽象化（Codable 対応）
-- **SecureStore** - Keychain の安全なラッパー（API キー・認証情報の保護）
-- **DocumentStore** - ファイルベース CRUD（JSON 個別ファイル、atomic write）
-- **RegistryStore** - 単一 JSON ファイルによるレジストリパターン
-- **KeyResolver** - Info.plist → Keychain → UserDefaults の多段フォールバック値解決
-- **テスト用 InMemory 実装** - 全プロトコルの InMemory 実装をバンドル
+- **プロトコル指向** — 永続化の操作をすべて抽象プロトコルで定義するので、ディスクにも Keychain にも
+  エンタイトルメントにも触れずにユースケースをテストできます
+- **KeyValueStore** — `UserDefaults` の型安全な抽象化。プリミティブはネイティブのアクセサを使い、
+  それ以外の `Codable` 型は自動で JSON に変換します
+- **SecureStore** — API キーや認証情報のための Keychain ラッパー。アクセシビリティは明示指定で、
+  既定はこの端末のみ
+- **DocumentStore** — ファイルベースの CRUD。ドキュメント 1 件が JSON ファイル 1 つで、書き込みは atomic
+- **RegistryStore** — `[String: Codable]` 辞書ごと単一 JSON ファイルに保存。キャッシュやメタデータの索引向け
+- **KeyResolver** — `Info.plist` → Keychain → `UserDefaults` の順で多段フォールバック
+- **全プロトコルのインメモリ実装** — シード可能・アクター分離済み。専用モジュールに分けてあるので
+  製品ターゲットに混入しません
 
-## インストール
+## クイックスタート
+
+```swift
+import PersistenceUserDefaults
+
+let store = UserDefaultsKeyValueStore()
+
+try await store.setValue("dark", forKey: "theme")
+let theme: String? = try await store.string(forKey: "theme")
+```
+
+バックエンドではなくプロトコルに依存させれば、同じコードがアプリでは本物のストアに、
+テストではインメモリのダブルに向きます。
+
+```swift
+import PersistenceCore
+import PersistenceTesting
+
+let store: any KeyValueStore = InMemoryKeyValueStore(["theme": "dark"])
+```
+
+## ドキュメント
+
+[**API リファレンスとガイド**](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/) —
+[Getting Started](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/gettingstarted/) と
+[Architecture](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/architecture/) を含みます。
+各バックエンドが耐久性・スレッド安全性・デコード失敗時の挙動について何を保証するかは Architecture にあります。
+
+## 導入
 
 ```swift
 // Package.swift
@@ -27,143 +62,17 @@ dependencies: [
 ]
 ```
 
-### モジュール構成
-
-用途に応じて必要なモジュールのみインポートできる:
-
-| モジュール | 用途 |
-|-----------|------|
-| `PersistenceCore` | プロトコル + エラー型（Foundation のみ、外部依存なし） |
-| `PersistenceUserDefaults` | UserDefaults ベースの KeyValueStore 実装 |
-| `PersistenceKeychain` | Keychain ベースの SecureStore 実装 |
-| `PersistenceFileSystem` | ファイルベースの DocumentStore / RegistryStore 実装 |
-| `PersistenceTesting` | InMemory 実装 5 種（テスト用 DI） |
-
-## クイックスタート
-
-### キーバリューストア（UserDefaults 抽象）
+ターゲットが実際に使うモジュールだけを足します。
 
 ```swift
-import PersistenceUserDefaults
-
-let store = UserDefaultsKeyValueStore()
-
-// Codable 値の保存・取得
-try await store.setValue("dark", forKey: "theme")
-let theme: String? = try await store.string(forKey: "theme")
-
-// カスタム型も対応
-struct UserPrefs: Codable, Sendable {
-    var fontSize: Int
-    var language: String
-}
-try await store.setValue(UserPrefs(fontSize: 14, language: "ja"), forKey: "prefs")
-let prefs: UserPrefs? = try await store.value(forKey: "prefs", type: UserPrefs.self)
+.product(name: "PersistenceCore",         package: "swift-persistence"),
+.product(name: "PersistenceUserDefaults", package: "swift-persistence"),
+.product(name: "PersistenceKeychain",     package: "swift-persistence"),
+.product(name: "PersistenceFileSystem",   package: "swift-persistence"),
+.product(name: "PersistenceTesting",      package: "swift-persistence"),  // テストターゲットのみ
 ```
 
-### セキュアストア（Keychain 抽象）
-
-```swift
-import PersistenceKeychain
-
-let secrets = KeychainSecureStore(service: "com.example.myapp")
-
-// API キーを安全に保存
-try await secrets.setString("sk-abc123...", forKey: "api_key")
-let key = try await secrets.getString(forKey: "api_key")
-```
-
-### ドキュメントストア（ファイルベース CRUD）
-
-```swift
-import PersistenceFileSystem
-
-struct Note: Codable, Identifiable, Sendable {
-    let id: UUID
-    var title: String
-    var body: String
-}
-
-let store = try FileSystemDocumentStore<Note>(
-    directory: documentsURL.appendingPathComponent("notes")
-)
-
-// CRUD 操作
-let note = Note(id: UUID(), title: "メモ", body: "内容")
-try await store.save(note)
-let all = try await store.loadAll()
-try await store.delete(id: note.id)
-```
-
-### レジストリストア（単一 JSON レジストリ）
-
-```swift
-import PersistenceFileSystem
-
-struct CacheEntry: Codable, Sendable {
-    let version: String
-    let downloadedAt: Date
-}
-
-let registry = FileSystemRegistryStore<CacheEntry>(
-    directory: cacheURL,
-    filename: "registry.json"
-)
-
-var entries = await registry.load()
-entries["model-v1"] = CacheEntry(version: "1.0", downloadedAt: Date())
-try await registry.save(entries)
-```
-
-### 多段フォールバック値解決
-
-```swift
-import PersistenceCore
-import PersistenceKeychain
-import PersistenceUserDefaults
-
-let resolver = ChainedKeyResolver(
-    secureStore: KeychainSecureStore(service: "com.example.myapp"),
-    keyValueStore: UserDefaultsKeyValueStore(),
-    keyMapping: [
-        "API_KEY": .init(secure: "api_key", keyValue: "api_key"),
-    ]
-)
-
-// Info.plist → Keychain → UserDefaults の順に探索
-let apiKey = await resolver.resolve("API_KEY")
-```
-
-### テスト用 InMemory 実装
-
-```swift
-import PersistenceTesting
-
-// テストで DI 注入
-let mockStore = InMemoryKeyValueStore()
-let mockSecrets = InMemorySecureStore()
-let mockDocs = InMemoryDocumentStore<Note>()
-
-let settings = AppSettings(
-    preferences: mockStore,
-    secrets: mockSecrets,
-    keyResolver: InMemoryKeyResolver(["API_KEY": "test-key"])
-)
-```
-
-## アーキテクチャ
-
-2 層構造で関心を分離する:
-
-```
-Layer 0: PersistenceCore           プロトコル + エラー型（外部依存なし）
-Layer 1: PersistenceUserDefaults   UserDefaults 具象実装
-         PersistenceKeychain       Keychain 具象実装
-         PersistenceFileSystem     ファイルシステム具象実装
-         PersistenceTesting        InMemory テストダブル
-```
-
-## 要件
+## 動作環境
 
 - iOS 17.0+ / macOS 14.0+
 - Swift 6.2+
@@ -171,9 +80,4 @@ Layer 1: PersistenceUserDefaults   UserDefaults 具象実装
 
 ## ライセンス
 
-MIT License - 詳細は [LICENSE](LICENSE) を参照
-
-## リンク
-
-- [Issue 報告](https://github.com/no-problem-dev/swift-persistence/issues)
-- [ディスカッション](https://github.com/no-problem-dev/swift-persistence/discussions)
+MIT — [LICENSE](LICENSE) を参照してください。

@@ -1,11 +1,23 @@
 import Foundation
 import PersistenceCore
 
-/// テスト用のインメモリ ``FileSystemReading`` & ``FileSystemWriting``。
+/// A file tree held in memory, for use in tests.
 ///
-/// ``addFile(_:string:)`` / ``addFile(_:data:)`` またはライト API でツリーを構築する。
-/// 先祖ディレクトリは暗黙的に作成される。
-/// ディスクに触れることなく探索・生成ロジックを決定的にテストできる。
+/// Build the tree with ``addFile(_:string:)``, ``addFile(_:data:)`` and ``addDirectory(_:)``, or
+/// just write into it. Either way the ancestor directories appear on their own, so there is never
+/// a parent to create first.
+///
+/// Nothing survives the process. Paths are standardised before use, which resolves `..` and drops
+/// a trailing slash, but nothing else about a real file system is modelled: no permissions, no
+/// symlinks, no case-insensitive matching, no file sizes. Anything not documented as failing
+/// succeeds.
+///
+/// Directory listings come back sorted, which the disk-backed implementation does not promise, so
+/// a test that leans on the order passes here and can still fail against a real disk. Reading a
+/// missing file throws ``PersistenceError/notFound(key:)`` here and
+/// ``PersistenceError/storageFailed(operation:reason:)`` there.
+///
+/// Being an actor, it is safe to share between tasks.
 public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
 
     private var files: [String: Data] = [:]
@@ -15,19 +27,19 @@ public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
 
     // MARK: - Building the tree
 
-    /// 生バイトのファイルを追加し、全先祖ディレクトリを登録する。
+    /// Puts a file at this URL, replacing any file already there and creating its ancestors.
     public func addFile(_ url: URL, data: Data) {
         let path = Self.normalize(url)
         files[path] = data
         registerAncestors(of: path)
     }
 
-    /// UTF-8 文字列からファイルを追加する。
+    /// Puts a file at this URL holding the UTF-8 bytes of a string.
     public func addFile(_ url: URL, string: String) {
         addFile(url, data: Data(string.utf8))
     }
 
-    /// 空ディレクトリを追加し、全先祖ディレクトリを登録する。
+    /// Creates an empty directory along with its ancestors.
     public func addDirectory(_ url: URL) {
         let path = Self.normalize(url)
         directories.insert(path)
@@ -54,6 +66,10 @@ public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
         directories.contains(Self.normalize(url))
     }
 
+    /// Lists the immediate children of a directory, sorted by path.
+    ///
+    /// The sort is this implementation's own convenience and not part of the protocol, so tests
+    /// that rely on it will not carry over to the disk-backed tree.
     public func contentsOfDirectory(_ url: URL) throws -> [URL] {
         let dir = Self.normalize(url)
         guard directories.contains(dir) else {
@@ -86,6 +102,9 @@ public actor InMemoryFileSystem: FileSystemReading, FileSystemWriting {
         addFile(url, data: data)
     }
 
+    /// Removes the path and everything beneath it, and never throws.
+    ///
+    /// A path that holds nothing is left alone, and the call reports nothing either way.
     public func removeItem(_ url: URL) throws {
         let path = Self.normalize(url)
         let prefix = path + "/"
