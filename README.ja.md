@@ -2,7 +2,7 @@
 
 # SwiftPersistence
 
-プロトコル指向の永続化抽象レイヤー。
+アプリのデータを、どこに保存されるかによらず 1 つのプロトコル越しに読み書きする。ユースケースを UserDefaults にも Keychain にもディスクにも触らずにテストできる。
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
