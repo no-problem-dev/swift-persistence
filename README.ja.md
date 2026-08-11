@@ -5,7 +5,7 @@
 アプリのデータを、どこに保存されるかによらず 1 つのプロトコル越しに読み書きする。ユースケースを UserDefaults にも Keychain にもディスクにも触らずにテストできる。
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
-![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
+![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+%20%7C%20Linux-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 ドメイン層・ユースケース層はプロトコルにだけ依存し、それを `UserDefaults` で満たすのか、
@@ -75,6 +75,7 @@ dependencies: [
 ## 動作環境
 
 - iOS 17.0+ / macOS 14.0+
+- Linux — `PersistenceKeychain` を除く全モジュール。Keychain は Apple の Security フレームワークに依存するため、Linux では `SecureStore` に自前の型を適合させる
 - Swift 6.2+
 - Xcode 16.0+
 

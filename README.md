@@ -5,7 +5,7 @@ English | [日本語](./README.ja.md)
 Read and write app data through one protocol, whichever store it lands in — so a use case can be tested without UserDefaults, the Keychain, or the disk.
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
-![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+-blue.svg)
+![Platforms](https://img.shields.io/badge/Platforms-iOS%2017.0+%20%7C%20macOS%2014.0+%20%7C%20Linux-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 Your domain and use-case layers depend on a protocol; the composition root picks whether that
@@ -77,6 +77,7 @@ Add only the modules a target actually needs:
 ## Requirements
 
 - iOS 17.0+ / macOS 14.0+
+- Linux — every module except `PersistenceKeychain`, which needs Apple's Security framework. Conform your own type to `SecureStore` there.
 - Swift 6.2+
 - Xcode 16.0+
 

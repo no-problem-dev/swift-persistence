@@ -9,6 +9,12 @@ import Foundation
 /// `Codable` overload.
 ///
 /// Implementations: ``KeychainSecureStore``, ``InMemorySecureStore``.
+///
+/// This protocol is available on every platform, but `KeychainSecureStore` is not: the Keychain is
+/// an Apple service, so `PersistenceKeychain` is an empty module on Linux. Server and CLI code
+/// there conforms its own type to this protocol — backed by libsecret, a KMS, or an encrypted
+/// file — and injects it wherever the Keychain store would have gone. Nothing above this layer
+/// changes, because callers depend on the protocol rather than on the store.
 public protocol SecureStore: Sendable {
 
     /// Reads a string from secure storage.

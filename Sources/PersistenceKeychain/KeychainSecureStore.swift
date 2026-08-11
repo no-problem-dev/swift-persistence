@@ -1,3 +1,10 @@
+// The Keychain is an Apple-platform service with no counterpart on Linux, so this whole file
+// compiles away there and `PersistenceKeychain` becomes an empty module rather than a build
+// failure. ``SecureStore`` itself lives in `PersistenceCore` and stays available everywhere, so a
+// Linux caller conforms their own type to it — libsecret, a KMS, an encrypted file — and injects
+// that wherever this store would have gone.
+#if canImport(Security)
+
 import Foundation
 import Security
 import PersistenceCore
@@ -201,3 +208,5 @@ public actor KeychainSecureStore: SecureStore {
         return query
     }
 }
+
+#endif

@@ -1,3 +1,7 @@
+// `KeychainSecureStore` only exists where the Security framework does, so this suite compiles
+// away on Linux along with the store it exercises.
+#if canImport(Security)
+
 import Testing
 import Foundation
 import PersistenceCore
@@ -106,3 +110,5 @@ struct KeychainSecureStoreTests {
         }
     }
 }
+
+#endif
