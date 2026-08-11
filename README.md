@@ -60,7 +60,7 @@ which explains what each backend guarantees about durability, threading, and dec
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-persistence.git", .upToNextMajor(from: "2.0.0"))
+    .package(url: "https://github.com/no-problem-dev/swift-persistence.git", from: "3.0.0")
 ]
 ```
 

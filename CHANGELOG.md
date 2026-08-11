@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-11
+
 ### Changed
 
 - Builds and tests on Linux. Keychain has no Linux equivalent, so `KeychainSecureStore` is behind
