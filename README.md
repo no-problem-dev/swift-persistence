@@ -50,9 +50,9 @@ let store: any KeyValueStore = InMemoryKeyValueStore(["theme": "dark"])
 
 ## Documentation
 
-[**API reference and guides**](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/) —
-including [Getting Started](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/gettingstarted/)
-and [Architecture](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/architecture/),
+[**API reference and guides**](Sources/PersistenceCore/Documentation.docc) —
+including [Getting Started](Sources/PersistenceCore/Documentation.docc/GettingStarted.md)
+and [Architecture](Sources/PersistenceCore/Documentation.docc/Architecture.md),
 which explains what each backend guarantees about durability, threading, and decode failure.
 
 ## Installation

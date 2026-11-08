@@ -48,9 +48,9 @@ let store: any KeyValueStore = InMemoryKeyValueStore(["theme": "dark"])
 
 ## ドキュメント
 
-[**API リファレンスとガイド**](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/) —
-[Getting Started](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/gettingstarted/) と
-[Architecture](https://no-problem-dev.github.io/swift-persistence/documentation/persistencecore/architecture/) を含みます。
+[**API リファレンスとガイド**](Sources/PersistenceCore/Documentation.docc) —
+[Getting Started](Sources/PersistenceCore/Documentation.docc/GettingStarted.md) と
+[Architecture](Sources/PersistenceCore/Documentation.docc/Architecture.md) を含みます。
 各バックエンドが耐久性・スレッド安全性・デコード失敗時の挙動について何を保証するかは Architecture にあります。
 
 ## 導入
